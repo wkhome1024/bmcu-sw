@@ -61,7 +61,7 @@ void MC_PWM_init()
 
 uint8_t PULL_key_stu[4] = {0, 0, 0, 0};
 uint8_t PULL_key_change[4] = {0, 0, 0, 0};
-#define PWM_lim 1000
+#define PWM_lim 700
 
 class MOTOR_PID
 {
