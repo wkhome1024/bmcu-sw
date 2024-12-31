@@ -160,7 +160,7 @@ public:
             speed_set = 6;
         }
 
-        float x = PID.caculate(now_speed - speed_set, (float)(time_now - time_last) / 1000);
+        float x = PID.caculate(now_speed - speed_set, (float)(time_now - time_last) / 100);
         if (x > 10)
             x += 200;
         else if (x < 10)

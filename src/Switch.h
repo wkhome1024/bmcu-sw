@@ -6,6 +6,7 @@ extern "C"
 {
 #endif
     extern void Switch_init();
+    extern bool Switch_read();
     extern bool get_bmcu_selected();
     extern void set_bmcu_selected(int selected);
     extern int get_filament_map_to(int num);

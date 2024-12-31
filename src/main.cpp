@@ -77,8 +77,8 @@ void loop()
                 Motion_control_run(-1);
                 SYS_RGB.set_RGB(0x30, 0x00, 0x00, 0);
                 error_times++;
-                error_times = error_times % 10;
-                if(error_times == 9)
+                error_times = error_times % 100;
+                if(error_times == 99)
                     RGB_update();
                 delayMicroseconds(1000);
             }

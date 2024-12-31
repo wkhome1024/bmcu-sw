@@ -552,24 +552,32 @@ bool set_motion(unsigned char AMS_num, unsigned char read_num, unsigned char sta
                 data_save.BambuBus_now_filament_num = read_num;
                 if (data_save.filament[AMS_num][channel].motion_set == need_pull_back)
                     data_save.filament[AMS_num][channel].motion_set = idle;
-                else if (data_save.filament[AMS_num][channel].motion_set != idle)
+                else if (data_save.filament[AMS_num][channel].motion_set == need_send_out)
                     data_save.filament[AMS_num][channel].motion_set = on_use;
             }
-            else
+            /*else
             {
                 data_save.BambuBus_now_filament_num = read_num;
                 if (data_save.filament[AMS_num][channel].motion_set == need_pull_back)
                     data_save.filament[AMS_num][channel].motion_set = idle;
                 else if (data_save.filament[AMS_num][channel].motion_set == need_send_out)
                     data_save.filament[AMS_num][channel].motion_set = on_use;
-            }
+            }*/
         }
-        else if (read_num == 0xFF)
+        else if ((read_num == 0xFF)&&(statu_flags == 0x01))//01 00
         {
             for (int i = 0; i < 4; i++)
             {
                 data_save.filament[AMS_num][i].motion_set = idle;
             }
+        }
+    }
+    else if (BambuBus_address == 0x00) // none
+    {
+        if ((read_num != 0xFF) && (read_num < 4))
+        {
+            data_save.BambuBus_now_filament_num = AMS_num * 4 + read_num;
+            data_save.filament[AMS_num][read_num].motion_set = on_use;
         }
     }
     else

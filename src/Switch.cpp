@@ -23,7 +23,7 @@ const unsigned char set_bmcu_filament_color2[4] = {0xBC, 0xBC, 0xBC, 0xFF}; //�
 const unsigned char set_bmcu_filament_color3[4] = {0x16, 0x16, 0x16, 0xFF}; //黑色
 void Switch_init()
 {
-    bool _init_ready = Bambubus_read();
+    bool _init_ready = Switch_read();
     if (!_init_ready)
     {
         switch_save.bmcu_num = 0;
