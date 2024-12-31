@@ -67,10 +67,10 @@ class MOTOR_PID
 {
 public:
     float P = 40;
-    float I = 1;
-    // float I = 1;
+    //float I = 1;
+    float I = 1.5;
     float D = 0;
-    // float D = 0.005;
+    //float D = 0.005;
     float I_save = 0;
     float E_last = 0;
     float pid_MAX = PWM_lim;
@@ -145,7 +145,7 @@ public:
         }
         if (motion == 1) // send
         {
-            speed_set = 10;
+            speed_set = 15;
         }
         else if (motion == 2) // slowly send
         {
@@ -160,7 +160,7 @@ public:
             speed_set = 6;
         }
 
-        float x = PID.caculate(now_speed - speed_set, (float)(time_now - time_last) / 100);
+        float x = PID.caculate(now_speed - speed_set, (float)(time_now - time_last) / 1000);
         if (x > 10)
             x += 200;
         else if (x < 10)
@@ -356,7 +356,7 @@ void motor_motion_run()
             else if (MOTOR_CONTROL[num].get_motion() != 2)
             {
                 if (PULL_key_stu[num] == 0)
-                    MOTOR_CONTROL[num].set_motion(100, 100);
+                    MOTOR_CONTROL[num].set_motion(100, 60);
             }
             RGB_set(num, 0xFF, 0xFF, 0xFF);
             break;
