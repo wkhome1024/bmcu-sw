@@ -145,7 +145,7 @@ public:
         }
         if (motion == 1) // send
         {
-            speed_set = 15;
+            speed_set = 40;
         }
         else if (motion == 2) // slowly send
         {
@@ -153,11 +153,11 @@ public:
         }
         else if (motion == -1) // pull
         {
-            speed_set = -15;
+            speed_set = -40;
         }
         else if (motion == 100) // over pressure
         { 
-            speed_set = 6;
+            speed_set = 10;
         }
 
         float x = PID.caculate(now_speed - speed_set, (float)(time_now - time_last) / 1000);
