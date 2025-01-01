@@ -23,7 +23,7 @@ void MC_PWM_init()
 
     // 定时器基础配置
     TIM_TimeBaseStructure.TIM_Period = 999;  // 周期
-    TIM_TimeBaseStructure.TIM_Prescaler = 1; // 预分频
+    TIM_TimeBaseStructure.TIM_Prescaler = 3; // 预分频
     TIM_TimeBaseStructure.TIM_ClockDivision = 0;
     TIM_TimeBaseStructure.TIM_CounterMode = TIM_CounterMode_Up;
     TIM_TimeBaseInit(TIM2, &TIM_TimeBaseStructure);
@@ -61,15 +61,15 @@ void MC_PWM_init()
 
 uint8_t PULL_key_stu[4] = {0, 0, 0, 0};
 uint8_t PULL_key_change[4] = {0, 0, 0, 0};
-#define PWM_lim 900
+#define PWM_lim 1000
 
 class MOTOR_PID
 {
 public:
-    float P = 10;
+    float P = 1.2;
     //float I = 1;
-    float I = 5;
-    float D = 0.1;
+    float I = 10;
+    float D = 0;
     //float D = 0.005;
     float I_save = 0;
     float E_last = 0;
@@ -86,7 +86,7 @@ public:
     {
 
         float I_save_set = (I_save + E * time_E);
-        if ((abs(I * I_save_set) < pid_range / 3)) // 对I限幅
+        if ((abs(I * I_save_set) < pid_range / 2)) // 对I限幅
             I_save = I_save_set;               // 线性I系数
 
         float ouput_buf = P * (E + I * (I_save) + D * (E - E_last) / time_E);
@@ -153,18 +153,18 @@ public:
         }
         else if (motion == -1) // pull
         {
-            speed_set = -40;
+            speed_set = -80;
         }
         else if (motion == 100) // over pressure
         { 
-            speed_set = 6;
+            speed_set = 15;
         }
 
         float x = PID.caculate(now_speed - speed_set, (float)(time_now - time_last) / 1000);
-        if (x > 10)
-            x += 200;
-        else if (x < 10)
-            x -= 200;
+        if (x > 5)
+            x += 400;
+        else if (x < 5)
+            x -= 400;
         else
             x = 0;
         if (x > PWM_lim)
@@ -287,7 +287,7 @@ void Motion_control_init()
     }*/
 }
 #define AS5600_PI 3.1415926535897932384626433832795
-#define speed_filter_k 300
+#define speed_filter_k 10
 float speed_as5600[4] = {0, 0, 0, 0};
 void AS5600_distance_updata()
 {
@@ -356,7 +356,7 @@ void motor_motion_run()
             else if (MOTOR_CONTROL[num].get_motion() != 2)
             {
                 if (PULL_key_stu[num] == 0)
-                    MOTOR_CONTROL[num].set_motion(100, 100 * 0.5);
+                    MOTOR_CONTROL[num].set_motion(100, 100 * 1);
             }
             RGB_set(num, 0xFF, 0xFF, 0xFF);
             break;
