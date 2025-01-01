@@ -68,8 +68,8 @@ class MOTOR_PID
 public:
     float P = 40;
     //float I = 1;
-    float I = 1.5;
-    float D = 0;
+    float I = 0.5;
+    float D = 0.01;
     //float D = 0.005;
     float I_save = 0;
     float E_last = 0;
@@ -346,7 +346,7 @@ void motor_motion_run()
             break;
         case need_pull_back:
             RGB_set(num, 0xFF, 0x00, 0xFF);
-            MOTOR_CONTROL[num].set_motion(-1, 1000 * 10); //10s
+            MOTOR_CONTROL[num].set_motion(-1, 1000 * 5); //5s
             break;
         case on_use:
             if (MOTOR_CONTROL[num].get_motion() == 1)
