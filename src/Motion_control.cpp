@@ -23,7 +23,7 @@ void MC_PWM_init()
 
     // 定时器基础配置
     TIM_TimeBaseStructure.TIM_Period = 999;  // 周期
-    TIM_TimeBaseStructure.TIM_Prescaler = 9; // 预分频
+    TIM_TimeBaseStructure.TIM_Prescaler = 1; // 预分频
     TIM_TimeBaseStructure.TIM_ClockDivision = 0;
     TIM_TimeBaseStructure.TIM_CounterMode = TIM_CounterMode_Up;
     TIM_TimeBaseInit(TIM2, &TIM_TimeBaseStructure);
@@ -61,15 +61,15 @@ void MC_PWM_init()
 
 uint8_t PULL_key_stu[4] = {0, 0, 0, 0};
 uint8_t PULL_key_change[4] = {0, 0, 0, 0};
-#define PWM_lim 700
+#define PWM_lim 900
 
 class MOTOR_PID
 {
 public:
-    float P = 40;
+    float P = 10;
     //float I = 1;
-    float I = 0.5;
-    float D = 0.01;
+    float I = 5;
+    float D = 0.1;
     //float D = 0.005;
     float I_save = 0;
     float E_last = 0;
@@ -86,7 +86,7 @@ public:
     {
 
         float I_save_set = (I_save + E * time_E);
-        if ((abs(I * I_save_set) < pid_range)) // 对I限幅
+        if ((abs(I * I_save_set) < pid_range / 3)) // 对I限幅
             I_save = I_save_set;               // 线性I系数
 
         float ouput_buf = P * (E + I * (I_save) + D * (E - E_last) / time_E);
@@ -145,7 +145,7 @@ public:
         }
         if (motion == 1) // send
         {
-            speed_set = 15;
+            speed_set = 40;
         }
         else if (motion == 2) // slowly send
         {
@@ -153,11 +153,11 @@ public:
         }
         else if (motion == -1) // pull
         {
-            speed_set = -15;
+            speed_set = -40;
         }
         else if (motion == 100) // over pressure
         { 
-            speed_set = 10;
+            speed_set = 6;
         }
 
         float x = PID.caculate(now_speed - speed_set, (float)(time_now - time_last) / 1000);
@@ -356,7 +356,7 @@ void motor_motion_run()
             else if (MOTOR_CONTROL[num].get_motion() != 2)
             {
                 if (PULL_key_stu[num] == 0)
-                    MOTOR_CONTROL[num].set_motion(100, 60);
+                    MOTOR_CONTROL[num].set_motion(100, 100 * 0.5);
             }
             RGB_set(num, 0xFF, 0xFF, 0xFF);
             break;
