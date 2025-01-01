@@ -145,7 +145,7 @@ public:
         }
         if (motion == 1) // send
         {
-            speed_set = 40;
+            speed_set = 15;
         }
         else if (motion == 2) // slowly send
         {
@@ -153,7 +153,7 @@ public:
         }
         else if (motion == -1) // pull
         {
-            speed_set = -40;
+            speed_set = -15;
         }
         else if (motion == 100) // over pressure
         { 
