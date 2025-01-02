@@ -66,11 +66,11 @@ uint8_t PULL_key_change[4] = {0, 0, 0, 0};
 class MOTOR_PID
 {
 public:
-    float P = 1.1;
+    float P = 1.15;
     //float I = 1;
-    float I = 10;
-    //float D = 0;
-    float D = 0.008;
+    float I = 11;
+    float D = 0;
+    //float D = 0.008;
     float I_save = 0;
     float E_last = 0;
     float pid_MAX = PWM_lim;
@@ -86,7 +86,7 @@ public:
     {
 
         float I_save_set = (I_save + E * time_E);
-        if ((abs(I * I_save_set) < pid_range / 3)) // 对I限幅
+        if ((abs(I * I_save_set) < pid_range / 2.7)) // 对I限幅
             I_save = I_save_set;               // 线性I系数
 
         float ouput_buf = P * (E + I * (I_save) + D * (E - E_last) / time_E);
@@ -139,7 +139,7 @@ public:
         }
         if ((motion == 0) || (get_filament_online(CHx) == false))
         {
-            Sendcount_clear(CHx);
+            //Sendcount_clear(CHx);
             PID.clear();
             Motion_control_set_PWM(CHx, 0);
             return;
@@ -346,15 +346,16 @@ void motor_motion_run()
     if (get_current_bmcu_num() != bmcu && Switch_autoready())
         set_bmcu_selected(bmcu);
     uint64_t time_now = get_time64();
-    uint64_t time_set = time_now + 5000; 
+    uint64_t time_set = time_now + 5000;
+    uint64_t time_set_2 = time_now + 3000;  
     if(get_filament_online(num)) {
         switch (get_filament_motion(num))
         {
         case need_send_out:
             RGB_set(num, 0x00, 0xFF, 0x00);
             if (senddelay_count[num] == 0)
-                senddelay_count[num] = time_set;
-            if (sendcheck_count[num] < time_now)
+                senddelay_count[num] = time_set_2;
+            if (senddelay_count[num] < time_now)
             {
             if (sendcheck_count[num] == 0)
                 sendcheck_count[num] = time_set;
@@ -371,6 +372,7 @@ void motor_motion_run()
             MOTOR_CONTROL[num].set_motion(-1, 1000 * 5); //5s
             break;
         case on_use:
+            Sendcount_clear(num);
             if (MOTOR_CONTROL[num].get_motion() == 1)
             {
                 MOTOR_CONTROL[num].set_motion(2, 2000);
@@ -383,6 +385,7 @@ void motor_motion_run()
             RGB_set(num, 0xFF, 0xFF, 0xFF);
             break;
         case idle:
+            Sendcount_clear(num);
             //MOTOR_CONTROL[num].set_motion(0, 100);
             RGB_set(num, 0x00, 0x00, 0x37);
             break;
