@@ -61,16 +61,16 @@ void MC_PWM_init()
 
 uint8_t PULL_key_stu[4] = {0, 0, 0, 0};
 uint8_t PULL_key_change[4] = {0, 0, 0, 0};
-#define PWM_lim 1000
+#define PWM_lim 900
 
 class MOTOR_PID
 {
 public:
-    float P = 1.2;
+    float P = 1.1;
     //float I = 1;
     float I = 10;
-    float D = 0;
-    //float D = 0.005;
+    //float D = 0;
+    float D = 0.02;
     float I_save = 0;
     float E_last = 0;
     float pid_MAX = PWM_lim;
@@ -86,7 +86,7 @@ public:
     {
 
         float I_save_set = (I_save + E * time_E);
-        if ((abs(I * I_save_set) < pid_range / 2)) // 对I限幅
+        if ((abs(I * I_save_set) < pid_range / 3)) // 对I限幅
             I_save = I_save_set;               // 线性I系数
 
         float ouput_buf = P * (E + I * (I_save) + D * (E - E_last) / time_E);
@@ -143,7 +143,7 @@ public:
             Motion_control_set_PWM(CHx, 0);
             return;
         }
-        if (motion == 1) // send
+        if (motion == 1) // send 370 40  130 15
         {
             speed_set = 40;
         }
@@ -151,11 +151,11 @@ public:
         {
             speed_set = 2;
         }
-        else if (motion == -1) // pull
+        else if (motion == -1) // pull 370 70 130 18
         {
-            speed_set = -80;
+            speed_set = -70;
         }
-        else if (motion == 100) // over pressure
+        else if (motion == 100) // over pressure 370 15 130 10
         { 
             speed_set = 15;
         }
