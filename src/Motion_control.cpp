@@ -139,8 +139,7 @@ public:
         }
         if ((motion == 0) || (get_filament_online(CHx) == false))
         {
-            sendcheck_count[CHx] = 0;
-            senddelay_count[CHx] = 0;
+            Sendcount_clear(CHx);
             PID.clear();
             Motion_control_set_PWM(CHx, 0);
             return;
@@ -333,6 +332,12 @@ void AS5600_distance_updata()
 
 uint64_t sendcheck_count[4] = {0, 0, 0, 0};
 uint64_t senddelay_count[4] = {0, 0, 0, 0};
+void Sendcount_clear(uint8_t CHx)
+{
+    sendcheck_count[CHx] = 0;
+    senddelay_count[CHx] = 0;
+}
+
 void motor_motion_run()
 {
     auto number = get_bmcu_and_channel(get_filament_map_to(get_now_filament_num()));
