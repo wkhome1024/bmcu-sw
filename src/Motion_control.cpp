@@ -346,7 +346,7 @@ void motor_motion_run()
     if (get_current_bmcu_num() != bmcu && Switch_autoready())
         set_bmcu_selected(bmcu);
     uint64_t time_now = get_time64();
-    uint64_t time_set = time_now + 5000;
+    uint64_t time_set = time_now + 10000;
     uint64_t time_set_2 = time_now + 3000;  
     if(get_filament_online(num)) {
         switch (get_filament_motion(num))

@@ -528,6 +528,20 @@ void set_motion_res_datas(unsigned char *set_buf, unsigned char AMS_num, unsigne
     set_buf[13] = 0;
     set_buf[24] = get_filament_left_char(AMS_num);
 }
+
+bool filament_check(unsigned char AMS_num)
+{
+    for (int i = 0; i < 4; i++)
+    {
+        if (data_save.filament[AMS_num][i].motion_set == on_use)
+        {
+            return true;
+        }
+        
+    }
+    return false;
+}
+
 bool set_motion(unsigned char AMS_num, unsigned char read_num, unsigned char statu_flags, unsigned char fliment_motion_flag, unsigned char channel)
 {
     if (BambuBus_address == 0x1200) // AMS lite
@@ -549,11 +563,21 @@ bool set_motion(unsigned char AMS_num, unsigned char read_num, unsigned char sta
             }
             else if ((statu_flags == 0x07) && (fliment_motion_flag == 0x00)) // 07 00
             {
+                if (!filament_check(AMS_num) && get_bmcu_selected())
+                {
+                    //data_save.BambuBus_now_filament_num = AMS_num * 4 + read_num;
+                    data_save.filament[AMS_num][channel].motion_set = on_use;
+                }
+                
                 data_save.BambuBus_now_filament_num = read_num;
                 if (data_save.filament[AMS_num][channel].motion_set == need_pull_back)
                     data_save.filament[AMS_num][channel].motion_set = idle;
                 else if (data_save.filament[AMS_num][channel].motion_set == need_send_out)
-                    data_save.filament[AMS_num][channel].motion_set = on_use;
+                    {
+                        data_save.filament[AMS_num][channel].motion_set = on_use;
+                        //Bambubus_set_need_to_save();
+                    }
+
             }
             /*else
             {
@@ -568,7 +592,8 @@ bool set_motion(unsigned char AMS_num, unsigned char read_num, unsigned char sta
         {
             for (int i = 0; i < 4; i++)
             {
-                data_save.filament[AMS_num][i].motion_set = idle;
+                if (data_save.filament[AMS_num][i].motion_set != on_use)
+                    data_save.filament[AMS_num][i].motion_set = idle;
             }
         }
     }
@@ -707,7 +732,8 @@ void send_for_Dxx(unsigned char *buf, int length)
     {
         for (int i = 0; i < 4; i++)
         {
-            set_filament_motion(i, idle);
+            if (data_save.filament[AMS_num][i].motion_set == need_pull_back)
+                set_filament_motion(i, idle);
         }
         if (package_num < 7)
             package_num++;
