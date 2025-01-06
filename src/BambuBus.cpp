@@ -563,11 +563,11 @@ bool set_motion(unsigned char AMS_num, unsigned char read_num, unsigned char sta
             }
             else if ((statu_flags == 0x07) && (fliment_motion_flag == 0x00)) // 07 00
             {
-                if (!filament_check(AMS_num) && get_bmcu_selected())
+                /*if (!filament_check(AMS_num) && get_bmcu_selected())
                 {
                     //data_save.BambuBus_now_filament_num = AMS_num * 4 + read_num;
                     data_save.filament[AMS_num][channel].motion_set = on_use;
-                }
+                }*/
                 
                 data_save.BambuBus_now_filament_num = read_num;
                 if (data_save.filament[AMS_num][channel].motion_set == need_pull_back)
