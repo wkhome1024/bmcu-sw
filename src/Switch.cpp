@@ -1,8 +1,8 @@
 #include "switch.h"
 #include "BambuBus.h"
 
-#define BMCUSwitch_version 2
-#define use_flash_addr ((uint32_t)0x0800F000 + 1024)
+#define BMCUSwitch_version 3
+#define use_flash_addr ((uint32_t)0x0800FA00)
 struct alignas(4) switch_save_struct
 {
     uint32_t version = BMCUSwitch_version;
@@ -151,7 +151,8 @@ void Switch_set_need_to_save()
 }
 void Switch_save()
 {
-    Flash_saves(&switch_save, sizeof(switch_save), use_flash_addr + sizeof(switch_save));
+    //Flash_saves(&switch_save, sizeof(switch_save), use_flash_addr + sizeof(switch_save));
+    Flash_saves(&switch_save, sizeof(switch_save), use_flash_addr);
     switch_need_to_save = false;
 }
 bool Switch_need_to_save()

@@ -70,7 +70,7 @@ public:
     //float I = 1;
     float I = 10;
     //float D = 0;
-    float D = 0.005;
+    float D = 0.002;
     float I_save = 0;
     float E_last = 0;
     float pid_MAX = PWM_lim;
@@ -137,7 +137,7 @@ public:
         {
             motion = 0;
         }
-        if ((motion == 0) || (get_filament_online(CHx) == false) || (motion == 3))
+        if ((motion == 0) || (get_filament_online(CHx) == false))
         {
             //Sendcount_clear(CHx);
             PID.clear();
@@ -151,6 +151,10 @@ public:
         else if (motion == 2) // slowly send
         {
             speed_set = 2;
+        }
+        else if (motion == 3) // stop
+        {
+            speed_set = 15;
         }
         else if (motion == -1) // pull 370 70 130 18
         {
@@ -346,8 +350,8 @@ void motor_motion_run()
     if (get_current_bmcu_num() != bmcu && Switch_autoready())
         set_bmcu_selected(bmcu);
     uint64_t time_now = get_time64();
-    uint64_t time_set = time_now + 200;
-    uint64_t time_set_2 = time_now + 3000;  
+    uint64_t time_set = time_now + 13000;
+    uint64_t time_set_2 = time_now + 8000;  
     if(get_filament_online(num)) {
         switch (get_filament_motion(num))
         {
@@ -357,28 +361,28 @@ void motor_motion_run()
                 senddelay_count[num] = time_set_2;
             if (senddelay_count[num] < time_now)
             {
-            //if (sendcheck_count[num] == 0)
-            //    sendcheck_count[num] = time_set;
-            //if (sendcheck_count[num] > time_now)
+            if (sendcheck_count[num] == 0)
+                sendcheck_count[num] = time_set;
+            if (sendcheck_count[num] > time_now)
                 MOTOR_CONTROL[num].set_motion(1, 100);
-            //else
-            //{   
-            //    MOTOR_CONTROL[num].set_motion(100, 100);
-            //}
+            else
+            {   
+                MOTOR_CONTROL[num].set_motion(3, 100);
+            }
             }
             break;
         case need_pull_back:
             RGB_set(num, 0xFF, 0x00, 0xFF);
-            MOTOR_CONTROL[num].set_motion(-1, 1000 * 7); 
+            MOTOR_CONTROL[num].set_motion(-1, 1000 * 9); 
             break;
         case on_use:
-            //Sendcount_clear(num);
-            if (sendcheck_count[num] == 0)
-                sendcheck_count[num] = time_set;
-            if (sendcheck_count[num] > time_now)
-                MOTOR_CONTROL[num].set_motion(3, 100); //刹车
-            else
-            {
+            Sendcount_clear(num);
+            //if (sendcheck_count[num] == 0)
+            //    sendcheck_count[num] = time_set;
+            //if (sendcheck_count[num] > time_now)
+            //    MOTOR_CONTROL[num].set_motion(3, 100); //刹车
+            //else
+            //{
             if (MOTOR_CONTROL[num].get_motion() == 3) 
             {
                 MOTOR_CONTROL[num].set_motion(2, 2000);
@@ -388,7 +392,7 @@ void motor_motion_run()
                 if (PULL_key_stu[num] == 0)
                     MOTOR_CONTROL[num].set_motion(100, 100);
             }
-            }
+            //}
             RGB_set(num, 0xFF, 0xFF, 0xFF);
             break;
         case idle:
