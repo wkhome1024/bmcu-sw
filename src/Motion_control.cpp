@@ -350,7 +350,7 @@ void motor_motion_run()
     if (get_current_bmcu_num() != bmcu && Switch_autoready())
         set_bmcu_selected(bmcu);
     uint64_t time_now = get_time64();
-    uint64_t time_set = time_now + 13000;
+    uint64_t time_set = time_now + 15000;
     uint64_t time_set_2 = time_now + 8000;  
     if(get_filament_online(num)) {
         switch (get_filament_motion(num))
@@ -373,7 +373,7 @@ void motor_motion_run()
             break;
         case need_pull_back:
             RGB_set(num, 0xFF, 0x00, 0xFF);
-            MOTOR_CONTROL[num].set_motion(-1, 1000 * 9); 
+            MOTOR_CONTROL[num].set_motion(-1, 1000 * 10); 
             break;
         case on_use:
             Sendcount_clear(num);
