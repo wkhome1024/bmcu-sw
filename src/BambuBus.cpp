@@ -592,7 +592,7 @@ bool set_motion(unsigned char AMS_num, unsigned char read_num, unsigned char sta
         {
             for (int i = 0; i < 4; i++)
             {
-                if (data_save.filament[AMS_num][i].motion_set != on_use)
+                if (data_save.filament[AMS_num][i].motion_set != on_use || !get_filament_online(i))
                     data_save.filament[AMS_num][i].motion_set = idle;
             }
         }
