@@ -1109,6 +1109,8 @@ package_type BambuBus_run()
             // send_for_REQx6(buf_X, data_length);
             break;
         case BambuBus_long_package_MC_online:
+            if (!get_bmcu_selected())
+                break;   
             send_for_long_packge_MC_online(buf_X, data_length);
             break;
         case BambuBus_longe_package_filament:

@@ -373,10 +373,15 @@ void motor_motion_run()
             break;
         case need_pull_back:
             RGB_set(num, 0xFF, 0x00, 0xFF);
-            MOTOR_CONTROL[num].set_motion(-1, 1000 * 11); 
+            if (senddelay_count[num] == 0)
+                senddelay_count[num] = time_set_2;
+            if (senddelay_count[num] > time_now)
+                MOTOR_CONTROL[num].set_motion(-1, 300);
+            else
+                MOTOR_CONTROL[num].set_motion(-1, 1000 * 11); 
             break;
         case on_use:
-            Sendcount_clear(num);
+            //Sendcount_clear(num);
             //if (sendcheck_count[num] == 0)
             //    sendcheck_count[num] = time_set;
             //if (sendcheck_count[num] > time_now)

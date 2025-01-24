@@ -90,7 +90,7 @@ void loop()
                     if(get_bmcu_selected())
                         SYS_RGB.set_RGB(0x10, 0x10, 0x10, 0);
                     else
-                        SYS_RGB.set_RGB(0x00, 0x00, 0x10, 0);
+                        SYS_RGB.set_RGB(0x00, 0x00, 0x30, 0);
                     Motion_control_run(0);
                     RGB_update();
                 }
