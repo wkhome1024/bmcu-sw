@@ -7,8 +7,8 @@ struct alignas(4) switch_save_struct
 {
     uint32_t version = BMCUSwitch_version;
     int bmcu_num = 0;
-    unsigned char current_bmcu_num = 0;
-    unsigned char filament_map_to[4];
+    int current_bmcu_num = 0;
+    int filament_map_to[4];
 } switch_save;
 
 const unsigned char select_bmcu_filament_name[] = "TPU-AMS"; //ID: GFU02

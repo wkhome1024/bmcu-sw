@@ -192,6 +192,7 @@ void send_uart(const unsigned char *data, uint16_t length)
     DMA_Cmd(DMA1_Channel4, ENABLE);
     GPIOA->BSHR = GPIO_Pin_12;
     // Enable USART1 DMA send
+    delay(1); //保持差分电压
     USART_DMACmd(USART1, USART_DMAReq_Tx, ENABLE);
 }
 
@@ -650,7 +651,7 @@ void send_for_Cxx(unsigned char *buf, int length)
     Cxx_res[1] = 0xC0 | (package_num << 3);
     unsigned char AMS_num = buf[5];
     unsigned char statu_flags = buf[6];
-    unsigned char read_num = buf[7];
+    unsigned char read_num = buf[9];
     unsigned char fliment_motion_flag = buf[8];
 
     /*if (!set_motion(AMS_num, read_num, statu_flags, fliment_motion_flag))
