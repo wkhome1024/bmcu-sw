@@ -651,7 +651,7 @@ void send_for_Cxx(unsigned char *buf, int length)
     Cxx_res[1] = 0xC0 | (package_num << 3);
     unsigned char AMS_num = buf[5];
     unsigned char statu_flags = buf[6];
-    unsigned char read_num = buf[9];
+    unsigned char read_num = buf[7];
     unsigned char fliment_motion_flag = buf[8];
 
     /*if (!set_motion(AMS_num, read_num, statu_flags, fliment_motion_flag))
@@ -659,7 +659,7 @@ void send_for_Cxx(unsigned char *buf, int length)
     auto number = get_bmcu_and_channel(get_filament_map_to(read_num));
     int bmcu = number.first;
     int channel = number.second;
-    if (bmcu != get_bmcu_num())
+    if (!check_bmcu_num(bmcu))
     {
         if (package_num < 7)
             package_num++;
@@ -729,7 +729,7 @@ void send_for_Dxx(unsigned char *buf, int length)
     auto number = get_bmcu_and_channel(get_filament_map_to(read_num));
     int bmcu = number.first;
     int channel = number.second;
-    if (bmcu != get_bmcu_num())
+    if (!check_bmcu_num(bmcu))
     {
         for (int i = 0; i < 4; i++)
         {
@@ -957,7 +957,7 @@ void send_for_long_packge_filament(unsigned char *buf, int length)
     auto number = get_bmcu_and_channel(get_filament_map_to(filament_num));
     int bmcu = number.first;
     int channel = number.second;
-    if (bmcu != get_bmcu_num())
+    if (!check_bmcu_num(bmcu))
         return;
     
     long_packge_filament[0] = AMS_num;

@@ -7,8 +7,8 @@ struct alignas(4) switch_save_struct
 {
     uint32_t version = BMCUSwitch_version;
     int bmcu_num = 0;
-    int current_bmcu_num = 0;
-    int filament_map_to[4];
+    unsigned char current_bmcu_num = 0;
+    unsigned char filament_map_to[4];
 } switch_save;
 
 const unsigned char select_bmcu_filament_name[] = "TPU-AMS"; //ID: GFU02
@@ -56,9 +56,9 @@ bool get_bmcu_selected()
     return switch_save.bmcu_num == switch_save.current_bmcu_num;
 }
 
-bool get_bmcu_num()
+bool check_bmcu_num(int bmcu)
 {
-    return switch_save.bmcu_num;
+    return switch_save.bmcu_num == bmcu;
 }
 
 std::pair<int, int> get_bmcu_and_channel(int number) {
