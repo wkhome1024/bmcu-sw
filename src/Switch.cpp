@@ -6,7 +6,7 @@
 struct alignas(4) switch_save_struct
 {
     uint32_t version = BMCUSwitch_version;
-    int bmcu_num = 0;
+    uint8_t bmcu_num = 0;
     unsigned char current_bmcu_num = 0;
     unsigned char filament_map_to[4];
 } switch_save;
@@ -46,7 +46,7 @@ bool Switch_read()
     return false;
 }
 
-int get_filament_map_to(int num)
+uint8_t get_filament_map_to(uint8_t num)
 {
     return switch_save.filament_map_to[num];
 }
@@ -56,23 +56,23 @@ bool get_bmcu_selected()
     return switch_save.bmcu_num == switch_save.current_bmcu_num;
 }
 
-bool check_bmcu_num(int bmcu)
+bool check_bmcu_num(uint8_t bmcu)
 {
     return switch_save.bmcu_num == bmcu;
 }
 
-std::pair<int, int> get_bmcu_and_channel(int number) {
-    int bmcuNumber = number / 4;      // 计算 AMS 编号
-    int channelNumber = number % 4; // 计算通道编号
+std::pair<uint8_t, uint8_t> get_bmcu_and_channel(uint8_t number) {
+    uint8_t bmcuNumber = number / 4;      // 计算 AMS 编号
+    uint8_t channelNumber = number % 4; // 计算通道编号
     return {bmcuNumber, channelNumber};
 }
 
-void set_bmcu_selected(int selected)
+void set_bmcu_selected(uint8_t selected)
 {
     switch_save.current_bmcu_num = selected;
     //Switch_set_need_to_save();
 }
-int get_current_bmcu_num()
+uint8_t get_current_bmcu_num()
 {
     return switch_save.current_bmcu_num;
 }

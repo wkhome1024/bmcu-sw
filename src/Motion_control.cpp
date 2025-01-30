@@ -345,8 +345,8 @@ void Sendcount_clear(uint8_t CHx)
 void motor_motion_run()
 {
     auto number = get_bmcu_and_channel(get_filament_map_to(get_now_filament_num()));
-    int bmcu = number.first;
-    int num = number.second;
+    uint8_t bmcu = number.first;
+    uint8_t num = number.second;
     if (get_current_bmcu_num() != bmcu && Switch_autoready())
         set_bmcu_selected(bmcu);
     uint64_t time_now = get_time64();

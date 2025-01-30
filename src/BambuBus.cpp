@@ -657,8 +657,8 @@ void send_for_Cxx(unsigned char *buf, int length)
     /*if (!set_motion(AMS_num, read_num, statu_flags, fliment_motion_flag))
         return;*/
     auto number = get_bmcu_and_channel(get_filament_map_to(read_num));
-    int bmcu = number.first;
-    int channel = number.second;
+    uint8_t bmcu = number.first;
+    uint8_t channel = number.second;
     if (!check_bmcu_num(bmcu))
     {
         if (package_num < 7)
@@ -727,8 +727,8 @@ void send_for_Dxx(unsigned char *buf, int length)
     unsigned char read_num = buf[9];
 
     auto number = get_bmcu_and_channel(get_filament_map_to(read_num));
-    int bmcu = number.first;
-    int channel = number.second;
+    uint8_t bmcu = number.first;
+    uint8_t channel = number.second;
     if (!check_bmcu_num(bmcu))
     {
         for (int i = 0; i < 4; i++)
@@ -955,8 +955,8 @@ void send_for_long_packge_filament(unsigned char *buf, int length)
     uint8_t filament_num = printer_data_long.datas[1];
     
     auto number = get_bmcu_and_channel(get_filament_map_to(filament_num));
-    int bmcu = number.first;
-    int channel = number.second;
+    uint8_t bmcu = number.first;
+    uint8_t channel = number.second;
     if (!check_bmcu_num(bmcu))
         return;
     
