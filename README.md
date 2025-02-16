@@ -59,3 +59,19 @@ robtillaart/CRC@^1.0.3     用于计算CRC校验
 
 其他未列出的群友-提供了宝贵的测试数据和建议
 
+## 多BMCU 并联切换设置命令    
+使用手机bambu app设置  主要设置颜色是手机中第一行和最后一行
+对应通道选择 TPU-AMS 白色 设置当前激活bmcu的编号 （4个bmcu从后向前设置挨个通电）
+对应通道选择 TPU-AMS 黄色 重置bmcu激活编号并重置重定向为激活编号bmcu的各通道
+对应通道选择 TPU-AMS 其他未用颜色 设置bmcu激活编号（不影响重定向）
+对应通道选择 TPU-AMS //棕色 //岩石灰 //灰色 //黑色 设置当前激活bmcu对应通道重定向到1-4通道 （先选其他颜色切换bmcu 再重定向通道 设置中看不到激活bmcu通道颜色 显示的为重定向通道颜色）
+# const unsigned char select_bmcu_filament_name[] = "TPU-AMS"; //ID: GFU02
+# const unsigned char set_bmcu_num_color[4] = {0xFF, 0xFF, 0xFF, 0xFF}; //white
+# const unsigned char set_bmcu_auto_color[4] = {0xD3, 0xC5, 0xA3, 0xFF};//沙漠黄
+# const unsigned char haset_bmcu_channel_color[4] = {0x40, 0x61, 0x00, 0xFF};
+# const unsigned char haceck_bmcu_channel_color[16] = {0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F};
+# const unsigned char reset_bmcu_channel_color[4] = {0xFF, 0xF1, 0x44, 0xFF}; //黄色
+# const unsigned char set_bmcu_filament_color0[4] = {0xAF, 0x79, 0x33, 0xFF}; //棕色
+# const unsigned char set_bmcu_filament_color1[4] = {0x89, 0x89, 0x89, 0xFF}; //岩石灰
+# const unsigned char set_bmcu_filament_color2[4] = {0xBC, 0xBC, 0xBC, 0xFF}; //灰色
+# const unsigned char set_bmcu_filament_color3[4] = {0x16, 0x16, 0x16, 0xFF}; //黑色

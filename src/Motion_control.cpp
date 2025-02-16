@@ -70,7 +70,7 @@ public:
     //float I = 1;
     float I = 10;
     //float D = 0;
-    float D = 0.002;
+    float D = 0.001;
     float I_save = 0;
     float E_last = 0;
     float pid_MAX = PWM_lim;
@@ -344,14 +344,14 @@ void Sendcount_clear(uint8_t CHx)
 
 void motor_motion_run()
 {
-    auto number = get_bmcu_and_channel(get_filament_map_to(get_now_filament_num()));
+    auto number = get_bmcu_and_channel(get_now_filament_num());
     uint8_t bmcu = number.first;
     uint8_t num = number.second;
     if (get_current_bmcu_num() != bmcu && Switch_autoready())
         set_bmcu_selected(bmcu);
     uint64_t time_now = get_time64();
-    uint64_t time_set = time_now + 12000;
-    uint64_t time_set_2 = time_now + 8000;  
+    uint64_t time_set = time_now + 15000;
+    uint64_t time_set_2 = time_now + 9500;  
     if(get_filament_online(num)) {
         switch (get_filament_motion(num))
         {
@@ -373,15 +373,11 @@ void motor_motion_run()
             break;
         case need_pull_back:
             RGB_set(num, 0xFF, 0x00, 0xFF);
-            if (senddelay_count[num] == 0)
-                senddelay_count[num] = time_set_2;
-            if (senddelay_count[num] > time_now)
-                MOTOR_CONTROL[num].set_motion(-1, 300);
-            else
-                MOTOR_CONTROL[num].set_motion(-1, 1000 * 11); 
+
+            MOTOR_CONTROL[num].set_motion(-1, 11000); 
             break;
         case on_use:
-            //Sendcount_clear(num);
+            Sendcount_clear(num);
             //if (sendcheck_count[num] == 0)
             //    sendcheck_count[num] = time_set;
             //if (sendcheck_count[num] > time_now)

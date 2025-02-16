@@ -61,7 +61,8 @@ bool check_bmcu_num(uint8_t bmcu)
     return switch_save.bmcu_num == bmcu;
 }
 
-std::pair<uint8_t, uint8_t> get_bmcu_and_channel(uint8_t number) {
+std::pair<uint8_t, uint8_t> get_bmcu_and_channel(uint8_t num) {
+    uint8_t number = get_filament_map_to(num);
     uint8_t bmcuNumber = number / 4;      // 计算 AMS 编号
     uint8_t channelNumber = number % 4; // 计算通道编号
     return {bmcuNumber, channelNumber};
