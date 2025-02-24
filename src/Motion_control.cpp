@@ -140,6 +140,7 @@ public:
         if ((motion == 0) || (get_filament_online(CHx) == false))
         {
             //Sendcount_clear(CHx);
+            set_filament_motion(CHx, idle);
             PID.clear();
             Motion_control_set_PWM(CHx, 0);
             return;
@@ -206,7 +207,7 @@ void MC_ONLINE_key_read(void)
 {
     uint8_t stu_read[4];
     uint64_t time_now = get_time64();
-    uint64_t time_set = time_now + 1000;
+    uint64_t time_set = time_now + 2000;
     stu_read[0] = digitalRead(PD0);
     stu_read[1] = digitalRead(PC15);
     stu_read[2] = digitalRead(PC14);
@@ -217,6 +218,10 @@ void MC_ONLINE_key_read(void)
         if (ONLINE_key_stu[i] == stu_read[i])
             ONLINE_key_stu_count[i] = time_set;
         else if (ONLINE_key_stu_count[i] < time_now)
+        {
+            ONLINE_key_stu[i] = stu_read[i];
+        }
+        else if (stu_read[i] == 0)
         {
             ONLINE_key_stu[i] = stu_read[i];
         }
@@ -336,10 +341,17 @@ void AS5600_distance_updata()
 
 uint64_t sendcheck_count[4] = {0, 0, 0, 0};
 uint64_t senddelay_count[4] = {0, 0, 0, 0};
+uint64_t pulldelay_count[4] = {10, 10, 10, 10};
+uint64_t pullcheck_count[4] = {0, 0, 0, 0};
 void Sendcount_clear(uint8_t CHx)
 {
     sendcheck_count[CHx] = 0;
     senddelay_count[CHx] = 0;
+}
+void Pullcount_clear(uint8_t CHx)
+{
+    pullcheck_count[CHx] = 0;
+    pulldelay_count[CHx] = 0;
 }
 
 void motor_motion_run()
@@ -352,6 +364,7 @@ void motor_motion_run()
     uint64_t time_now = get_time64();
     uint64_t time_set = time_now + 15000;
     uint64_t time_set_2 = time_now + 9500;  
+    uint64_t time_set_3 = time_now + 5000;
     if(get_filament_online(num)) {
         switch (get_filament_motion(num))
         {
@@ -373,11 +386,25 @@ void motor_motion_run()
             break;
         case need_pull_back:
             RGB_set(num, 0xFF, 0x00, 0xFF);
+            if (pulldelay_count[num] == 0)
+                pulldelay_count[num] = time_set_3;
+            if (pulldelay_count[num] > time_now)
+                MOTOR_CONTROL[num].set_motion(-1, 1000 * 11);
+            else
+            {
+            if (pullcheck_count[num] == 0)
+                pullcheck_count[num] = time_set_3;
+            if (pullcheck_count[num] > time_now)
+                MOTOR_CONTROL[num].set_motion(-1, 300);
+            else
+                MOTOR_CONTROL[num].set_motion(0, 100);
 
-            MOTOR_CONTROL[num].set_motion(-1, 11000); 
+            }
+
+            //MOTOR_CONTROL[num].set_motion(-1, 11000); 
             break;
         case on_use:
-            Sendcount_clear(num);
+            Pullcount_clear(num);
             //if (sendcheck_count[num] == 0)
             //    sendcheck_count[num] = time_set;
             //if (sendcheck_count[num] > time_now)
