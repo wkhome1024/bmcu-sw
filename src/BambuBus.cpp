@@ -551,7 +551,7 @@ bool set_motion(unsigned char AMS_num, unsigned char read_num, unsigned char sta
         // fliment_motion_flag: 3F need pull back, BF need send out
 
         if (read_num < 4)
-        {
+        {        
             if ((statu_flags == 0x03) && (fliment_motion_flag == 0x3F)) // 03 3F
             {
                 data_save.BambuBus_now_filament_num = read_num;

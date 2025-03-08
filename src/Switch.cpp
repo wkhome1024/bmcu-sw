@@ -108,6 +108,7 @@ bool Switch_set_filament(unsigned char *buf, int length, uint8_t AMS_num, uint8_
                 }
                 
             }
+            Switch_set_longpull();
         }
         else if(memcmp(buf + 15, set_bmcu_auto_color, 4) == 0)
         {
@@ -119,6 +120,7 @@ bool Switch_set_filament(unsigned char *buf, int length, uint8_t AMS_num, uint8_
             && memcmp(buf + 15, set_bmcu_num_color, sizeof(set_bmcu_num_color)) == 0)
         {
             switch_save.bmcu_num = read_num;
+            Switch_set_not_longpull();
         }
         else if(memcmp(buf + 15, reset_bmcu_channel_color, 4) == 0)
         {
@@ -129,6 +131,7 @@ bool Switch_set_filament(unsigned char *buf, int length, uint8_t AMS_num, uint8_
             switch_save.filament_map_to[3] = read_num * 4 + 3;
             Switch_set_need_to_delay();
             Switch_set_not_autoready();
+            Switch_set_longpull();
         }
         // other color
         else if (memcmp(buf + 15, set_bmcu_num_color, sizeof(set_bmcu_num_color)) != 0)
@@ -136,6 +139,7 @@ bool Switch_set_filament(unsigned char *buf, int length, uint8_t AMS_num, uint8_
             switch_save.current_bmcu_num = read_num;
             Switch_set_need_to_delay();
             Switch_set_not_autoready();
+            Switch_set_longpull();
         }
 
         Switch_set_need_to_save();
@@ -187,4 +191,27 @@ void Switch_set_not_autoready()
 bool Switch_autoready()
 {
     return switch_autoready;
+}
+bool switch_longpull = false;
+bool pull_check = false;
+bool Switch_longpull()
+{
+    return switch_longpull;
+}
+void Switch_set_longpull()
+{
+    switch_longpull = true;
+    pull_check = true;
+}
+void Switch_set_not_longpull()
+{
+    switch_longpull = false;
+}
+bool Switch_pullcheck()
+{
+    return pull_check;
+}
+void Switch_set_no_pullcheck()
+{
+    pull_check = false;
 }

@@ -22,7 +22,12 @@ extern "C"
     extern void Switch_set_need_to_delay();
     extern void Switch_set_autoready();
     extern void Switch_set_not_autoready();
-    extern bool Switch_autoready();    
+    extern bool Switch_autoready();
+    extern void Switch_set_longpull(); 
+    extern void Switch_set_not_longpull();
+    extern bool Switch_longpull();
+    extern bool Switch_pullcheck();
+    extern void Switch_set_no_pullcheck();    
 #ifdef __cplusplus
 }
 #endif
