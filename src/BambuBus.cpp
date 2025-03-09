@@ -1101,7 +1101,7 @@ package_type BambuBus_run()
             break;
         case BambuBus_package_filament_motion_long:
             send_for_Dxx(buf_X, data_length);
-            time_motion = timex + 1000;
+            time_motion = timex + 10000;
             break;
         case BambuBus_package_online_detect:
             if (!get_bmcu_selected())

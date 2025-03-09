@@ -153,13 +153,13 @@ public:
         {
             speed_set = 40;
         }
-        else if (motion == 2) // slowly send
+        else if (motion == 2) // over pressure
         {
             speed_set = 2;
         }
-        else if (motion == 3) // stop
+        else if (motion == 3) // slowly send
         {
-            speed_set = 15;
+            speed_set = 25;
         }
         else if (motion == -1 || motion == -2) // pull 370 70 130 18
         {
@@ -416,7 +416,7 @@ void motor_motion_run()
         if (num != lastnum && check_bmcu_num(bmcu))
         {
             if (pullcheck[lastnum] == 2)
-                MOTOR_CONTROL[lastnum].set_motion(-1, 1000 * 10);   //短回抽通道 退料
+                MOTOR_CONTROL[lastnum].set_motion(-1, 1000 * 12);   //短回抽通道 退料
             Sendcount_clear(lastnum);
             Pullcount_clear(lastnum);
             lastnum = num;
@@ -430,7 +430,7 @@ void motor_motion_run()
             if (pullcheck[i] == 2)
             {   
                 if (get_filament_motion(i) == idle)
-                    MOTOR_CONTROL[i].set_motion(-1, 1000 * 10);   //所有通道退回五通后
+                    MOTOR_CONTROL[i].set_motion(-1, 1000 * 12);   //所有通道退回五通后
             }    
         }        
         Pullcheck_clear();
@@ -488,7 +488,7 @@ void motor_motion_run()
             Pullcount_clear(num);                //注销 短回抽
             if (MOTOR_CONTROL[num].get_motion() == 3) 
             {
-                MOTOR_CONTROL[num].set_motion(2, 2000);
+                MOTOR_CONTROL[num].set_motion(2, 2000);    //保持压力
             }
             else if (MOTOR_CONTROL[num].get_motion() == 2 && ONLINE_key_change[num] == 1)   //触发回抽信号 停电机
             {
