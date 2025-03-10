@@ -159,7 +159,7 @@ public:
         }
         else if (motion == 3) // slowly send
         {
-            speed_set = 25;
+            speed_set = 10;
         }
         else if (motion == -1 || motion == -2) // pull 370 70 130 18
         {
@@ -445,13 +445,14 @@ void motor_motion_run()
                 senddelay_count[num] = time_set_2;
             if (senddelay_count[num] < time_now)
             {
-            if (sendcheck_count[num] == 0)
-                sendcheck_count[num] = time_set;
-            if (sendcheck_count[num] > time_now && ONLINE_key_change[num] == 0)
+            //if (sendcheck_count[num] == 0)
+            //    sendcheck_count[num] = time_set;
+            //if (sendcheck_count[num] > time_now && ONLINE_key_change[num] == 0)
+            if (ONLINE_key_change[num] == 0)
                 MOTOR_CONTROL[num].set_motion(1, 100);
             else
             {    
-                MOTOR_CONTROL[num].set_motion(3, 100);
+                MOTOR_CONTROL[num].set_motion(2, 100);
             }
             }
             if (ONLINE_key_change[num] == 0)       //进料重试
@@ -475,7 +476,7 @@ void motor_motion_run()
                 pullcheck_count[num] = time_set_3;
             if (pullcheck_count[num] > time_now)
             {
-                MOTOR_CONTROL[num].set_motion(-2, 300);
+                MOTOR_CONTROL[num].set_motion(-2, 500);
             }  
             else
             {
@@ -486,7 +487,7 @@ void motor_motion_run()
             break;
         case on_use:
             Pullcount_clear(num);                //注销 短回抽
-            if (MOTOR_CONTROL[num].get_motion() == 3) 
+            if (MOTOR_CONTROL[num].get_motion() == 1) 
             {
                 MOTOR_CONTROL[num].set_motion(2, 2000);    //保持压力
             }
