@@ -70,7 +70,7 @@ public:
     //float I = 1;
     float I = 10;
     //float D = 0;
-    float D = 0.001;
+    float D = 0.0008;
     float I_save = 0;
     float E_last = 0;
     float pid_MAX = PWM_lim;
@@ -165,11 +165,11 @@ public:
         {
             speed_set = -60;
         }
-        else if (motion == 100) // over pressure 370 15 130 10
+        else if (motion == 100) // slowly send 370 15 130 10
         { 
             speed_set = 15;
         }
-        else if (motion == -100) // over pressure 370 15 130 10
+        else if (motion == -100) // slowly pull 370 15 130 10
         { 
             speed_set = -15;
         }
@@ -395,7 +395,7 @@ void motor_motion_run()
     if (get_current_bmcu_num() != bmcu && Switch_autoready())
         set_bmcu_selected(bmcu);
     uint64_t time_now = get_time64();
-    uint64_t time_set = time_now + 18000;
+    //uint64_t time_set = time_now + 18000;
     uint64_t time_set_2 = time_now + 11500;  
     uint64_t time_set_3 = time_now + 5000;
     if (!Switch_longpull())                                //短回抽
@@ -482,6 +482,7 @@ void motor_motion_run()
             {
                 MOTOR_CONTROL[num].set_motion(0, 100);
                 set_filament_motion(num, idle);                              //防止卡回抽状态
+                pullcheck_count[num] = 0;
             }
             }           
             break;
