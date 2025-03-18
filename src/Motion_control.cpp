@@ -141,7 +141,7 @@ public:
         {
             set_filament_motion(CHx, idle);
         }
-        if ((motion == 0) || (get_filament_online(CHx) == false))
+        if ((motion == 0) || (get_filament_online(CHx) == false) || (motion == 99))
         {
             //Sendcount_clear(CHx);
             //set_filament_motion(CHx, idle);
@@ -167,11 +167,11 @@ public:
         }
         else if (motion == 100) // slowly send 370 15 130 10
         { 
-            speed_set = 15;
+            speed_set = 10;
         }
         else if (motion == -100) // slowly pull 370 15 130 10
         { 
-            speed_set = -15;
+            speed_set = -20;
         }
 
         float x = PID.caculate(now_speed - speed_set, (float)(time_now - time_last) / 1000);
@@ -306,7 +306,7 @@ void Motion_control_init()
     }*/
 }
 #define AS5600_PI 3.1415926535897932384626433832795
-#define speed_filter_k 10
+#define speed_filter_k 5
 float speed_as5600[4] = {0, 0, 0, 0};
 void AS5600_distance_updata()
 {
@@ -490,13 +490,13 @@ void motor_motion_run()
             Pullcount_clear(num);                //注销 短回抽
             if (MOTOR_CONTROL[num].get_motion() == 1) 
             {
-                MOTOR_CONTROL[num].set_motion(2, 2000);    //保持压力
+                MOTOR_CONTROL[num].set_motion(99, 50);    //停电机 清空pid
             }
-            else if (MOTOR_CONTROL[num].get_motion() == 2 && ONLINE_key_change[num] == 1)   //触发回抽信号 停电机
+            else if (MOTOR_CONTROL[num].get_motion() == 99)   
             {
-                MOTOR_CONTROL[num].set_motion(99, 200);    //保持压力延迟200ms
+                MOTOR_CONTROL[num].set_motion(2, 1000);    //保持压力延迟1000ms
             }
-            else if (MOTOR_CONTROL[num].get_motion() != 2 && MOTOR_CONTROL[num].get_motion() != 99)
+            else if (MOTOR_CONTROL[num].get_motion() != 2 || PULL_key_stu[num] == 0)
             {
                 if (PULL_key_stu[num] == 0)
                     MOTOR_CONTROL[num].set_motion(100, 100);

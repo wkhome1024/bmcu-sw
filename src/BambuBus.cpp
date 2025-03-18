@@ -510,8 +510,9 @@ void set_motion_res_datas(unsigned char *set_buf, unsigned char AMS_num, unsigne
 
     // unsigned char fliment_motion_flag = buf[8];
     float meters = 0;
-    uint8_t flagx = 0x02;
-    if (read_num != 0xFF)
+    uint16_t pressure = 0xFFFF;
+    uint8_t flagx = 0x00;
+    /*if (read_num != 0xFF)
     {
         if (BambuBus_address == 0x700) // AMS08
         {
@@ -521,12 +522,30 @@ void set_motion_res_datas(unsigned char *set_buf, unsigned char AMS_num, unsigne
         {
             meters = data_save.filament[AMS_num][channel].meters;
         }
+    }*/
+    if ((read_num != 0xFF) && (read_num < 4))
+    {
+        meters = data_save.filament[AMS_num][channel].meters;
+        //pressure = data_save.filament[AMS_num][read_num].pressure;
+        if ((data_save.filament[AMS_num][channel].motion_set == idle)|| (data_save.filament[AMS_num][channel].motion_set == need_pull_back)) // idle or pull back
+        {
+            flagx = 0x00;
+        }
+        else if ((data_save.filament[AMS_num][channel].motion_set == need_send_out) ) // sending
+        {
+            flagx = 0x02;
+        }
+        else if ((data_save.filament[AMS_num][channel].motion_set == on_use)) // on use
+        {
+            flagx = 0x04;
+        }
     }
     set_buf[0] = AMS_num;
+    set_buf[1] = 0x00;
     set_buf[2] = flagx;
     set_buf[3] = read_num; // maybe using number
     memcpy(set_buf + 4, &meters, sizeof(meters));
-    set_buf[13] = 0;
+    memcpy(set_buf + 8, &pressure, sizeof(uint16_t));
     set_buf[24] = get_filament_left_char(AMS_num);
 }
 
@@ -668,6 +687,8 @@ void send_for_Cxx(unsigned char *buf, int length)
 
         return;
     }
+    if (!set_motion(AMS_num, read_num, statu_flags, fliment_motion_flag, channel))
+    return;
 
     set_motion_res_datas(Cxx_res + 5, AMS_num, read_num, channel);
     package_send_with_crc(Cxx_res, sizeof(Cxx_res));
