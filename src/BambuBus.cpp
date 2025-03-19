@@ -495,9 +495,12 @@ uint8_t get_filament_left_char(uint8_t AMS_num)
         if (data_save.filament[AMS_num][i].statu == online)
         {
             data |= (0x1 << i) << i; // 1<<(2*i)
+            if (BambuBus_address == 0x700)
+            {
             if (data_save.filament[AMS_num][i].motion_set != idle)
             {
                 data |= (0x2 << i) << i; // 2<<(2*i)
+            }
             }
         }
     }
@@ -688,7 +691,7 @@ void send_for_Cxx(unsigned char *buf, int length)
         return;
     }
     if (!set_motion(AMS_num, read_num, statu_flags, fliment_motion_flag, channel))
-    return;
+       return;
 
     set_motion_res_datas(Cxx_res + 5, AMS_num, read_num, channel);
     package_send_with_crc(Cxx_res, sizeof(Cxx_res));

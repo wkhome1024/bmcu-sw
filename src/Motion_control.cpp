@@ -386,14 +386,23 @@ bool Pullcheck(uint8_t CHx)
     }
     return false;
 }
+bool Bmcucheck()
+{
+    for (int i = 0; i < 4; i++)
+    {
+        if (PULL_key_stu[i] == 0 || ONLINE_key_change[i] == 0)
+            return true;  
+
+    }
+    return false;
+}
 uint8_t lastnum = 0;
 void motor_motion_run()
 {  
     auto number = get_bmcu_and_channel(get_now_filament_num());
     uint8_t bmcu = number.first;
     uint8_t num = number.second;
-    if (get_current_bmcu_num() != bmcu && Switch_autoready())
-        set_bmcu_selected(bmcu);
+
     uint64_t time_now = get_time64();
     //uint64_t time_set = time_now + 18000;
     uint64_t time_set_2 = time_now + 11500;  
@@ -548,6 +557,10 @@ void Motion_control_run(int error)
         }
         }
     }
+    if (!Bmcucheck())     //强制激活当前bmcu
+    {
+        set_bmcu_selected();
+    }   
     if (error)
     {
         for (int i = 0; i < 4; i++)

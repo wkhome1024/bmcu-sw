@@ -8,7 +8,7 @@ extern "C"
     extern void Switch_init();
     extern bool Switch_read();
     extern bool get_bmcu_selected();
-    extern void set_bmcu_selected(uint8_t selected);
+    extern void set_bmcu_selected();
     extern uint8_t get_filament_map_to(uint8_t num);
     extern bool check_bmcu_num(uint8_t bmcu);
     extern uint8_t get_current_bmcu_num();

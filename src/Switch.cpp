@@ -65,13 +65,15 @@ std::pair<uint8_t, uint8_t> get_bmcu_and_channel(uint8_t num) {
     uint8_t number = get_filament_map_to(num);
     uint8_t bmcuNumber = number / 4;      // 计算 AMS 编号
     uint8_t channelNumber = number % 4; // 计算通道编号
+    if (num >= 4)
+       bmcuNumber = switch_save.current_bmcu_num;
     return {bmcuNumber, channelNumber};
 }
 
-void set_bmcu_selected(uint8_t selected)
+void set_bmcu_selected()
 {
-    switch_save.current_bmcu_num = selected;
-    //Switch_set_need_to_save();
+    switch_save.current_bmcu_num = switch_save.bmcu_num;
+    Switch_set_need_to_save();
 }
 uint8_t get_current_bmcu_num()
 {
