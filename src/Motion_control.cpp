@@ -70,7 +70,7 @@ public:
     //float I = 1;
     float I = 10;
     //float D = 0;
-    float D = 0.0008;
+    float D = 0.001;
     float I_save = 0;
     float E_last = 0;
     float pid_MAX = PWM_lim;
@@ -141,7 +141,7 @@ public:
         {
             set_filament_motion(CHx, idle);
         }
-        if ((motion == 0) || (get_filament_online(CHx) == false) || (motion == 99))
+        if ((motion == 0) || (get_filament_online(CHx) == false))
         {
             //Sendcount_clear(CHx);
             //set_filament_motion(CHx, idle);
@@ -149,6 +149,13 @@ public:
             Motion_control_set_PWM(CHx, 0);
             return;
         }
+        if (motion == 99)     //刹车
+        {
+            PID.clear();
+            Motion_control_set_PWM(CHx, 1000);
+            return;
+        }
+        
         if (motion == 1) // send 370 40  130 15
         {
             speed_set = 40;
@@ -157,9 +164,9 @@ public:
         {
             speed_set = 2;
         }
-        else if (motion == 3) // slowly send
+        else if (motion == -3) // slowly pull
         {
-            speed_set = 10;
+            speed_set = -30;
         }
         else if (motion == -1 || motion == -2) // pull 370 70 130 18
         {
@@ -167,7 +174,7 @@ public:
         }
         else if (motion == 100) // slowly send 370 15 130 10
         { 
-            speed_set = 10;
+            speed_set = 12;
         }
         else if (motion == -100) // slowly pull 370 15 130 10
         { 
@@ -211,11 +218,13 @@ void MC_PULL_key_init()
 uint8_t ONLINE_key_stu[4] = {0, 0, 0, 0};
 uint64_t ONLINE_key_stu_count[4] = {0, 0, 0, 0};
 uint8_t ONLINE_key_change[4] = {0, 0, 0, 0};
+uint64_t ONLINE_key_change_count[4] = {0, 0, 0, 0};
 void MC_ONLINE_key_read(void)
 {
     uint8_t stu_read[4];
     uint64_t time_now = get_time64();
-    uint64_t time_set = time_now + 2500;
+    uint64_t time_set = time_now + 4000;
+    uint64_t time_set1 = time_now + 50;
     stu_read[0] = digitalRead(PD0);
     stu_read[1] = digitalRead(PC15);
     stu_read[2] = digitalRead(PC14);
@@ -224,16 +233,27 @@ void MC_ONLINE_key_read(void)
     for (int i = 0; i < 4; i++)
     {
         if (ONLINE_key_stu[i] == stu_read[i])
+        {
             ONLINE_key_stu_count[i] = time_set;
+            ONLINE_key_change_count[i] = time_set1;
+        }
         else if (ONLINE_key_stu_count[i] < time_now)
         {
             ONLINE_key_stu[i] = stu_read[i];
         }
-        else if (stu_read[i] == 0)
+        else if (ONLINE_key_change_count[i] < time_now)   //防止微动抖动
+        {
+            ONLINE_key_change[i] = stu_read[i];
+            ONLINE_key_change_count[i] = time_set1;
+        }
+
+        if (stu_read[i] == 0)
         {
             ONLINE_key_stu[i] = stu_read[i];
+            ONLINE_key_change[i] = stu_read[i];
         }
-        ONLINE_key_change[i] = stu_read[i];
+
+        //ONLINE_key_change[i] = stu_read[i];
     }
 }
 void MC_ONLINE_key_init()
@@ -254,7 +274,12 @@ void MC_ONLINE_key_init()
 void Motion_control_set_PWM(uint8_t CHx, int PWM)
 {
     uint16_t set1 = 0, set2 = 0;
-    if (PWM > 0)
+    if (PWM == 1000)
+    {
+        set1 = PWM;
+        set2 = PWM;
+    }
+    else if (PWM > 0)
     {
         set1 = PWM;
     }
@@ -306,7 +331,7 @@ void Motion_control_init()
     }*/
 }
 #define AS5600_PI 3.1415926535897932384626433832795
-#define speed_filter_k 5
+#define speed_filter_k 10
 float speed_as5600[4] = {0, 0, 0, 0};
 void AS5600_distance_updata()
 {
@@ -490,8 +515,11 @@ void motor_motion_run()
             else
             {
                 MOTOR_CONTROL[num].set_motion(0, 100);
-                set_filament_motion(num, idle);                              //防止卡回抽状态
-                pullcheck_count[num] = 0;
+                if(pullcheck_count[num] < time_now - 5000)
+                {
+                    pullcheck_count[num] = 0;
+                    //set_filament_motion(num, idle);                      //防止卡回抽状态
+                }
             }
             }           
             break;
