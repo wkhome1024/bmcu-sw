@@ -131,6 +131,7 @@ public:
     void run(float now_speed)
     {
         uint64_t time_now = get_time64();
+        static uint64_t time_set_speed = 0;
         static uint64_t time_last = 0;
         float speed_set = 0;
         if (time_now >= motor_stop_time)
@@ -192,6 +193,17 @@ public:
             x = PWM_lim;
         if (x < -PWM_lim)
             x = -PWM_lim;
+        if ((now_speed > 1 && now_speed < 70) || motion == 0)
+        {
+            time_set_speed = time_now + 5000;
+        }
+        if (time_set_speed < time_now && time_set_speed != 0)
+        {
+            if (x > 800)
+                x = 0;
+            else if (x < -800)
+                x = 0;                                                                  //防止电机卡死过热
+        } 
         Motion_control_set_PWM(CHx, -x);
         time_last = time_now;
     }

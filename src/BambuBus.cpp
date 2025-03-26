@@ -625,7 +625,7 @@ bool set_motion(unsigned char AMS_num, unsigned char read_num, unsigned char sta
         if ((read_num != 0xFF) && (read_num < 4))
         {
             data_save.BambuBus_now_filament_num = AMS_num * 4 + read_num;
-            data_save.filament[AMS_num][read_num].motion_set = on_use;
+            data_save.filament[AMS_num][channel].motion_set = on_use;
         }
     }
     else
