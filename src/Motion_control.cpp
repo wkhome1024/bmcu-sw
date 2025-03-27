@@ -70,7 +70,7 @@ public:
     //float I = 1;
     float I = 10;
     //float D = 0;
-    float D = 0.001;
+    float D = 0.0005;
     float I_save = 0;
     float E_last = 0;
     float pid_MAX = PWM_lim;
@@ -86,7 +86,7 @@ public:
     {
 
         float I_save_set = (I_save + E * time_E);
-        if ((abs(I * I_save_set) < pid_range / 3)) // 对I限幅
+        if ((abs(I * I_save_set) < pid_range / 2)) // 对I限幅
             I_save = I_save_set;               // 线性I系数
 
         float ouput_buf = P * (E + I * (I_save) + D * (E - E_last) / time_E);
@@ -152,11 +152,8 @@ public:
         }
         if (motion == 99)     //刹车
         {
-            PID.clear();
-            Motion_control_set_PWM(CHx, 1000);
-            return;
-        }
-        
+            speed_set = 0;
+        }       
         if (motion == 1) // send 370 40  130 15
         {
             speed_set = 40;
@@ -286,12 +283,7 @@ void MC_ONLINE_key_init()
 void Motion_control_set_PWM(uint8_t CHx, int PWM)
 {
     uint16_t set1 = 0, set2 = 0;
-    if (PWM == 1000)
-    {
-        set1 = PWM;
-        set2 = PWM;
-    }
-    else if (PWM > 0)
+    if (PWM > 0)
     {
         set1 = PWM;
     }
@@ -343,7 +335,7 @@ void Motion_control_init()
     }*/
 }
 #define AS5600_PI 3.1415926535897932384626433832795
-#define speed_filter_k 10
+#define speed_filter_k 1
 float speed_as5600[4] = {0, 0, 0, 0};
 void AS5600_distance_updata()
 {
