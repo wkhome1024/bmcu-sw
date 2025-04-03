@@ -61,7 +61,7 @@ void MC_PWM_init()
 
 uint8_t PULL_key_stu[4] = {0, 0, 0, 0};
 uint8_t PULL_key_change[4] = {0, 0, 0, 0};
-#define PWM_lim 900
+#define PWM_lim 800
 
 class MOTOR_PID
 {
@@ -181,24 +181,24 @@ public:
 
         float x = PID.caculate(now_speed - speed_set, (float)(time_now - time_last) / 1000);
         if (x > 5)
-            x += 400;
+            x += 300;
         else if (x < 5)
-            x -= 400;
+            x -= 300;
         else
             x = 0;
         if (x > PWM_lim)
             x = PWM_lim;
         if (x < -PWM_lim)
             x = -PWM_lim;
-        if ((now_speed > 1 && now_speed < 70) || motion == 0)
+        if (now_speed > 0.5 || motion == 0 || now_speed < -0.5)
         {
             time_set_speed = time_now + 5000;
         }
         if (time_set_speed < time_now && time_set_speed != 0)
         {
-            if (x > 800)
+            if (x > 700)
                 x = 0;
-            else if (x < -800)
+            else if (x < -700)
                 x = 0;                                                                  //防止电机卡死过热
         } 
         Motion_control_set_PWM(CHx, -x);

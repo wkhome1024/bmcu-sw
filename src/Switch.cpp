@@ -194,7 +194,7 @@ bool Switch_autoready()
 {
     return switch_autoready;
 }
-bool switch_longpull = false;
+bool switch_longpull = true;
 bool pull_check = false;
 bool Switch_longpull()
 {
