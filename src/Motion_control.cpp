@@ -61,7 +61,7 @@ void MC_PWM_init()
 
 uint8_t PULL_key_stu[4] = {0, 0, 0, 0};
 uint8_t PULL_key_change[4] = {0, 0, 0, 0};
-#define PWM_lim 800
+#define PWM_lim 900
 
 class MOTOR_PID
 {
@@ -70,7 +70,7 @@ public:
     //float I = 1;
     float I = 10;
     //float D = 0;
-    float D = 0.0005;
+    float D = 0.0007;
     float I_save = 0;
     float E_last = 0;
     float pid_MAX = PWM_lim;
@@ -164,7 +164,7 @@ public:
         }
         else if (motion == -3) // slowly pull
         {
-            speed_set = -30;
+            speed_set = -80;
         }
         else if (motion == -1 || motion == -2) // pull 370 70 130 18
         {
@@ -176,7 +176,7 @@ public:
         }
         else if (motion == -100) // slowly pull 370 15 130 10
         { 
-            speed_set = -20;
+            speed_set = -40;
         }
 
         float x = PID.caculate(now_speed - speed_set, (float)(time_now - time_last) / 1000);
@@ -196,9 +196,9 @@ public:
         }
         if (time_set_speed < time_now && time_set_speed != 0)
         {
-            if (x > 700)
+            if (x > 760)
                 x = 0;
-            else if (x < -700)
+            else if (x < -760)
                 x = 0;                                                                  //防止电机卡死过热
         } 
         Motion_control_set_PWM(CHx, -x);
@@ -227,13 +227,13 @@ void MC_PULL_key_init()
 uint8_t ONLINE_key_stu[4] = {0, 0, 0, 0};
 uint64_t ONLINE_key_stu_count[4] = {0, 0, 0, 0};
 uint8_t ONLINE_key_change[4] = {0, 0, 0, 0};
-uint64_t ONLINE_key_change_count[4] = {0, 0, 0, 0};
+//uint64_t ONLINE_key_change_count[4] = {0, 0, 0, 0};
 void MC_ONLINE_key_read(void)
 {
     uint8_t stu_read[4];
     uint64_t time_now = get_time64();
     uint64_t time_set = time_now + 4000;
-    uint64_t time_set1 = time_now + 50;
+    //uint64_t time_set1 = time_now + 50;
     stu_read[0] = digitalRead(PD0);
     stu_read[1] = digitalRead(PC15);
     stu_read[2] = digitalRead(PC14);
@@ -244,25 +244,25 @@ void MC_ONLINE_key_read(void)
         if (ONLINE_key_stu[i] == stu_read[i])
         {
             ONLINE_key_stu_count[i] = time_set;
-            ONLINE_key_change_count[i] = time_set1;
+            //ONLINE_key_change_count[i] = time_set1;
         }
         else if (ONLINE_key_stu_count[i] < time_now)
         {
             ONLINE_key_stu[i] = stu_read[i];
         }
-        else if (ONLINE_key_change_count[i] < time_now)   //防止微动抖动
-        {
-            ONLINE_key_change[i] = stu_read[i];
-            ONLINE_key_change_count[i] = time_set1;
-        }
+        //else if (ONLINE_key_change_count[i] < time_now)   //防止微动抖动
+       // {
+       //     ONLINE_key_change[i] = stu_read[i];
+       //     ONLINE_key_change_count[i] = time_set1;
+       // }
 
         if (stu_read[i] == 0)
         {
             ONLINE_key_stu[i] = stu_read[i];
-            ONLINE_key_change[i] = stu_read[i];
+            //ONLINE_key_change[i] = stu_read[i];
         }
 
-        //ONLINE_key_change[i] = stu_read[i];
+        ONLINE_key_change[i] = stu_read[i];
     }
 }
 void MC_ONLINE_key_init()
@@ -497,7 +497,7 @@ void motor_motion_run()
                 send_count[num] = time_now + 1000;
             if (send_count[num] < time_now && send_count[num] !=0)
             {
-                MOTOR_CONTROL[num].set_motion(-1, 100);
+                MOTOR_CONTROL[num].set_motion(-3, 500);
             }
             break;
         case need_pull_back:
