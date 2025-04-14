@@ -1,10 +1,6 @@
 #include <Arduino.h>
 #include "main.h"
 
-#include "BambuBus.h"
-#include "Switch.h"
-
-extern void debug_send_run();
 #include "WS2812.h"
 WS2812_class SYS_RGB;
 WS2812_class RGBOUT[4];
@@ -37,10 +33,7 @@ void setup()
     RCC_APB2PeriphClockCmd(RCC_APB2Periph_AFIO, ENABLE);
     GPIO_PinRemapConfig(GPIO_Remap_PD01, ENABLE);
     BambuBus_init();
-    Switch_init();
-    DEBUG_init();
     Motion_control_init();
-
     RGB_init();
     SYS_RGB.set_RGB(0x00, 0x00, 0x00, 0);
     RGBOUT[0].set_RGB(0x00, 0x00, 0x00, 0);
@@ -87,7 +80,7 @@ void loop()
                 error_times = 0;
                 if (stu == BambuBus_package_heartbeat)
                 {
-                    if(get_bmcu_selected())
+                    if(Bmcu_set())
                         SYS_RGB.set_RGB(0x10, 0x10, 0x10, 0);
                     else
                         SYS_RGB.set_RGB(0x00, 0x00, 0x30, 0);
@@ -95,13 +88,6 @@ void loop()
                     RGB_update();
                 }
                 
-                if(Switch_need_to_save())
-                    Switch_save();
-                if(Switch_need_to_delay())
-                {
-                    Switch_set_not_to_delay();
-                    delay(5000);
-                }
             }
         }
     }

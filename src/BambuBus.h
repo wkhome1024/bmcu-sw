@@ -44,6 +44,7 @@ extern "C"
     extern bool Bambubus_read();
     extern void Bambubus_save();
     extern void Bambubus_set_need_to_save();
+    extern void set_bmcu_num(uint8_t num);
     extern int get_now_filament_num();
     extern void reset_filament_meters(int num);
     extern void add_filament_meters(int num, float meters);
@@ -53,6 +54,9 @@ extern "C"
     void set_filament_motion(int num, _filament_motion_state_set motion);
     _filament_motion_state_set get_filament_motion(int num);
     void set_now_filament_num(int num);
+    extern bool Bmcu_reset();
+    extern void Bmcu_set_no_reset();
+    extern void Bmcu_set_num(uint8_t num)
 
 #ifdef __cplusplus
 }

@@ -6,8 +6,9 @@ CRC8 crc_8;
 
 uint8_t BambuBus_data_buf[1000];
 int BambuBus_have_data = 0;
-uint16_t BambuBus_address = 0;
+uint16_t BambuBus_address = 0x1200;
 uint8_t AMS_num = 1;
+bool bmcu_reset = false;
 
 struct _filament
 {
@@ -58,7 +59,10 @@ void Bambubus_save()
 {
     Flash_saves(&data_save, sizeof(data_save), use_flash_addr);
 }
-
+void set_bmcu_num(uint8_t num)
+{
+    data_save.bmcu = num;
+}
 int get_now_filament_num()
 {
     return data_save.BambuBus_now_filament_num;
@@ -359,40 +363,18 @@ bool package_check_crc16(uint8_t *data, int data_length)
 bool need_debug = false;
 void package_send_with_crc(uint8_t *data, int data_length)
 {
-
+    if (data[0] != 0x7D)
+    {
+        return;
+    }
     crc_8.restart();
-    if (data[1] & 0x80)
-    {
-        for (auto i = 0; i < 3; i++)
-        {
-            crc_8.add(data[i]);
-        }
-        data[3] = crc_8.calc();
-    }
-    else
-    {
-        for (auto i = 0; i < 6; i++)
-        {
-            crc_8.add(data[i]);
-        }
-        data[6] = crc_8.calc();
-    }
-    crc_16.restart();
-    data_length -= 2;
     for (auto i = 0; i < data_length; i++)
     {
-        crc_16.add(data[i]);
+        crc_8.add(data[i]);
     }
-    uint16_t num = crc_16.calc();
-    data[(data_length)] = num & 0xFF;
-    data[(data_length + 1)] = num >> 8;
-    data_length += 2;
+    uint16_t num = crc_8.calc();
+    data[(data_length -1 )] = num ;
     send_uart(data, data_length);
-    if (need_debug)
-    {
-        DEBUG_num(data, data_length);
-        need_debug = false;
-    }
 }
 
 uint8_t packge_send_buf[1000];
@@ -684,26 +666,26 @@ void send_for_Cxx(unsigned char *buf, int length)
     if (!set_motion(AMS_num, read_num, statu_flags, fliment_motion_flag))
         return;
     
-    if (package_num != 2 || package_num != 5)
+    if (package_num != 3 || package_num != 8)
     {
         package_num++;
         return;
     }
 
     set_motion_res_datas(Cxx_res + 2, AMS_num);
-    send_uart(Cxx_res, sizeof(Cxx_res));
-    if (package_num < 18)
+    package_send_with_crc(Cxx_res, sizeof(Cxx_res));
+    if (package_num < 20)
         package_num++;
     else
         package_num = 0;
 }
 
 unsigned char Hit_res[] = {0x7D, 0xE4,
-                           0x00, 0x00,      //amsnum
+                           0x00, 0x00,      //amsnum + 控制位
                            0x00, 0x00, 0x00, 0x00,    //flag
                            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  //meters
                            0x55,   //online
-                           0xE4};
+                           0xE4};  //crc8校验位
 void send_for_Hit(unsigned char *buf, int length)
 {
 
@@ -714,7 +696,7 @@ void send_for_Hit(unsigned char *buf, int length)
         return;
 
     set_motion_res_datas(Hit_res + 2, AMS_num);
-    send_uart(Hit_res, sizeof(Hit_res));   
+    package_send_with_crc(Hit_res, sizeof(Hit_res));   
  
 }
 
@@ -796,7 +778,7 @@ void send_for_Dxx(unsigned char *buf, int length)
 
     set_motion_res_datas(Dxx_res + 2, AMS_num);
 
-    send_uart(Dxx_res, sizeof(Dxx_res));
+    package_send_with_crc(Dxx_res, sizeof(Dxx_res));
     if (package_num < 18)
         package_num++;
     else
@@ -872,7 +854,7 @@ void send_for_Fxx(unsigned char *buf, int length)
             F00_res[i * sizeof(F01_res) + 6] = i;
             F00_res[i * sizeof(F01_res) + 7] = i;
         }
-        package_send_with_crc(F00_res, sizeof(F00_res));
+        //package_send_with_crc(F00_res, sizeof(F00_res));
     }
 
     if ((buf[5] == 0x01) && (buf[6] < 4))
@@ -887,7 +869,7 @@ void send_for_Fxx(unsigned char *buf, int length)
         // memcpy(online_detect_num, buf + 8, sizeof(online_detect_num));
         //  F00_res[5] = buf[5];
         //  F00_res[6] = buf[6];
-        package_send_with_crc(F01_res, sizeof(F01_res));
+        //package_send_with_crc(F01_res, sizeof(F01_res));
     }
 }
 // 3D C5 0D F1 07 00 00 00 00 00 00 CE EC
@@ -900,7 +882,7 @@ void send_for_NFC_detect(unsigned char *buf, int length)
     filament_flag_detected = 1 << buf[6];
     NFC_detect_res[6] = buf[6];
     NFC_detect_res[7] = buf[7];
-    package_send_with_crc(NFC_detect_res, sizeof(NFC_detect_res));
+    //package_send_with_crc(NFC_detect_res, sizeof(NFC_detect_res));
 }
 
 unsigned char long_packge_MC_online[] = {0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
@@ -1042,15 +1024,21 @@ void send_for_long_packge_version(unsigned char *buf, int length)
 unsigned char s = 0x01;
 
 unsigned char Set_filament_res[] = {0x3D, 0xC0, 0x08, 0xB2, 0x08, 0x60, 0xB4, 0x04};
+const unsigned char select_bmcu_filament_name[] = "TPU-AMS"; //ID: GFU02
 
 void send_for_Set_filament(unsigned char *buf, int length)
 {
     uint8_t read_num = buf[5];
     uint8_t AMS_num = read_num & 0xF0;
     read_num = read_num & 0x0F;
+    
+    if (memcmp(select_bmcu_filament_name, buf + 23, sizeof(select_bmcu_filament_name)) == 0)
+    {
+        bmcu_reset = true;
+        return; 
+    }
 
-    if(!Switch_set_filament(buf, length, AMS_num, read_num))
-        return;
+    
 
     memcpy(data_save.filament[AMS_num][read_num].ID, buf + 7, sizeof(data_save.filament[AMS_num][read_num].ID));
 
@@ -1062,7 +1050,7 @@ void send_for_Set_filament(unsigned char *buf, int length)
     memcpy(&data_save.filament[AMS_num][read_num].temperature_min, buf + 19, 2);
     memcpy(&data_save.filament[AMS_num][read_num].temperature_max, buf + 21, 2);
     memcpy(data_save.filament[AMS_num][read_num].name, buf + 23, sizeof(data_save.filament[AMS_num][read_num].name));
-    package_send_with_crc(Set_filament_res, sizeof(Set_filament_res));
+    //package_send_with_crc(Set_filament_res, sizeof(Set_filament_res));
     Bambubus_set_need_to_save();
 }
 
@@ -1096,7 +1084,7 @@ package_type BambuBus_run()
             break;
         case BambuBus_package_filament_motion_long:
             send_for_Dxx(buf_X, data_length);
-            time_motion = timex + 1000;
+            time_motion = timex + 5000;
             break;
         case BambuBus_package_online_detect:
             //send_for_Fxx(buf_X, data_length);
@@ -1145,4 +1133,17 @@ package_type BambuBus_run()
 
     // NFC_detect_run();
     return stu;
+}
+
+bool Bmcu_reset()
+{
+    return bmcu_reset;
+}
+void Bmcu_set_no_reset()
+{
+    bmcu_reset = false;
+}
+void Bmcu_set_num(uint8_t num)
+{
+    data_save.bmcu = num;
 }

@@ -1,5 +1,4 @@
 #include "Motion_control.h"
-#include "Switch.h"
 
 void MC_PWM_init()
 {
@@ -70,7 +69,7 @@ public:
     //float I = 1;
     float I = 10;
     //float D = 0;
-    float D = 0.0007;
+    float D = 0.001;
     float I_save = 0;
     float E_last = 0;
     float pid_MAX = PWM_lim;
@@ -164,7 +163,7 @@ public:
         }
         else if (motion == -3) // slowly pull
         {
-            speed_set = -80;
+            speed_set = -60;
         }
         else if (motion == -1 || motion == -2) // pull 370 70 130 18
         {
@@ -176,14 +175,14 @@ public:
         }
         else if (motion == -100) // slowly pull 370 15 130 10
         { 
-            speed_set = -40;
+            speed_set = -50;
         }
 
         float x = PID.caculate(now_speed - speed_set, (float)(time_now - time_last) / 1000);
         if (x > 5)
-            x += 300;
+            x += 350;
         else if (x < 5)
-            x -= 300;
+            x -= 350;
         else
             x = 0;
         if (x > PWM_lim)
@@ -196,9 +195,9 @@ public:
         }
         if (time_set_speed < time_now && time_set_speed != 0)
         {
-            if (x > 760)
+            if (x > 800)
                 x = 0;
-            else if (x < -760)
+            else if (x < -800)
                 x = 0;                                                                  //防止电机卡死过热
         } 
         Motion_control_set_PWM(CHx, -x);
@@ -371,7 +370,7 @@ void AS5600_distance_updata()
         float speedx = distance_E / T * 1000;
         T = speed_filter_k / (T + speed_filter_k);
         speed_as5600[i] = speedx * (1 - T) + speed_as5600[i] * T; // mm/s
-        if (get_filament_motion(i) != need_send_out)
+        if (get_filament_motion(i) == on_use)
             add_filament_meters(i, distance_E / 1000);
     }
     time_last = time_now;
@@ -428,30 +427,20 @@ bool Bmcucheck()
 uint8_t lastnum = 0;
 void motor_motion_run()
 {  
-    auto number = get_bmcu_and_channel(get_now_filament_num());
-    uint8_t bmcu = number.first;
-    uint8_t num = number.second;
 
+    uint8_t num = get_now_filament_num();
     uint64_t time_now = get_time64();
     //uint64_t time_set = time_now + 18000;
     uint64_t time_set_2 = time_now + 11500;  
     uint64_t time_set_3 = time_now + 5000;
-    if (!Switch_longpull())                                //短回抽
-    {
-        sendcheck_count[num] = 1;
-        senddelay_count[num] = 1;
-        pulldelay_count[num] = 1;
-    }
-    else
+
     {
         if (!Pullcheck(num))
         {
             senddelay_count[num] = 1;
             pulldelay_count[num] = 1;
-            if (pullcheck[num] == 2)
-                sendcheck_count[num] = 1;
         }       
-        if (num != lastnum && check_bmcu_num(bmcu))
+        if (num != lastnum)
         {
             if (pullcheck[lastnum] == 2)
                 MOTOR_CONTROL[lastnum].set_motion(-1, 1000 * 12);   //短回抽通道 退料
@@ -461,7 +450,7 @@ void motor_motion_run()
             Pullcheck_clear();
         }    
     }
-    if (Switch_pullcheck())
+    if (Bmcu_reset())
     {
         for (int i = 0; i < 4; i++)
         {
@@ -472,7 +461,7 @@ void motor_motion_run()
             }    
         }        
         Pullcheck_clear();
-        Switch_set_no_pullcheck();
+        Bmcu_set_no_reset();
     }   
     if(get_filament_online(num)) {
         switch (get_filament_motion(num))
@@ -481,10 +470,10 @@ void motor_motion_run()
             RGB_set(num, 0x00, 0xFF, 0x00);
             if (senddelay_count[num] == 0)
                 senddelay_count[num] = time_set_2;
-            if (senddelay_count[num] < time_now)
+            if (senddelay_count[num] < time_now )
             {
             //if (sendcheck_count[num] == 0)
-            //    sendcheck_count[num] = time_set;
+                sendcheck_count[num] = 0;
             //if (sendcheck_count[num] > time_now && ONLINE_key_change[num] == 0)
             if (ONLINE_key_change[num] == 0)
                 MOTOR_CONTROL[num].set_motion(1, 100);
@@ -493,11 +482,14 @@ void motor_motion_run()
                 MOTOR_CONTROL[num].set_motion(2, 100);
             }
             }
-            if (ONLINE_key_change[num] == 0)       //进料重试
-                send_count[num] = time_now + 1000;
-            if (send_count[num] < time_now && send_count[num] !=0)
+            if (ONLINE_key_change[num] == 1 && sendcheck_count[num] == 0)       //进料重试
             {
-                MOTOR_CONTROL[num].set_motion(-3, 500);
+                send_count[num] = time_now + 2000;
+                sendcheck_count[num] = 1;
+            }
+            if (send_count[num] > time_now)
+            {
+                MOTOR_CONTROL[num].set_motion(-3, 100);
             }
             break;
         case need_pull_back:
@@ -565,20 +557,23 @@ void motor_motion_run()
     MOTOR_CONTROL[num].run(speed_as5600[num]);
 
 }
-
+bool bmcuset_en = false;
+bool Bmcu_set()
+{
+    return bmcuset_en;
+}
 void Motion_control_run(int error)
 {
     MC_PULL_key_read();
     MC_ONLINE_key_read();
 
     AS5600_distance_updata();
-   
+    uint64_t time_now = get_time64();
+    uint64_t time_bmcuset = 0;
+
     for (int i = 0; i < 4; i++)
     {
-        if (Switch_autoready())
-            set_filament_online(i, true); 
-        else
-        {
+
         if ((ONLINE_key_stu[i] == 0) && (MC_AS5600.online[i] == true))
         {
             set_filament_online(i, true);
@@ -586,13 +581,36 @@ void Motion_control_run(int error)
         else
         {
             set_filament_online(i, false);
-        }
-        }
+        }      
     }
-    if (!Bmcucheck())     //强制激活当前bmcu
+    if (!Bmcucheck())
     {
-        set_bmcu_selected();
-    }   
+        time_bmcuset = time_now + 10000;
+    }
+
+    if (time_bmcuset > time_now && time_bmcuset < time_now + 8000)
+        bmcuset_en = true;
+    else 
+        bmcuset_en = false;
+    
+    if (bmcuset_en)                         //手动设置bmcu编号
+    {
+        uint8_t num = 0;
+        for (int i = 1; i < 5; i++)
+        {
+            if (PULL_key_stu[i-1] == 0 || ONLINE_key_change[i-1] == 0)
+                num += i;
+        }
+
+        if (time_bmcuset > time_now && time_bmcuset < time_now + 2000 && num != 0)
+        {
+            Bmcu_set_num(num - 1);
+            time_bmcuset = time_now;
+        }
+        
+    }
+    
+
     if (error)
     {
         for (int i = 0; i < 4; i++)
