@@ -1016,16 +1016,21 @@ unsigned char s = 0x01;
 
 unsigned char Set_filament_res[] = {0x3D, 0xC0, 0x08, 0xB2, 0x08, 0x60, 0xB4, 0x04};
 const unsigned char select_bmcu_filament_name[] = "TPU-AMS"; //ID: GFU02
-
+const unsigned char reset_bmcu_meter_color[4] = {0xFF, 0xFF, 0xFF, 0xFF}; //white
+const unsigned char reset_bmcu_channel_color[4] = {0xFF, 0xF1, 0x44, 0xFF}; //黄色
 void send_for_Set_filament(unsigned char *buf, int length)
 {
     uint8_t read_num = buf[5];
     uint8_t AMS_num = read_num & 0xF0;
     read_num = read_num & 0x0F;
-    
+    AMS_num = AMS_num >>4;
     if (memcmp(select_bmcu_filament_name, buf + 23, sizeof(select_bmcu_filament_name)) == 0)
     {
-        bmcu_reset = true;
+        if (memcmp(buf + 15, reset_bmcu_channel_color, 4) == 0)
+           bmcu_reset = true;
+        else if (memcmp(buf + 15, reset_bmcu_meter_color, 4) == 0)
+           reset_filament_meters(read_num);
+
         return; 
     }
 
