@@ -81,7 +81,7 @@ void loop()
                 if (stu == BambuBus_package_heartbeat)
                 {
                     if(Bmcu_set())
-                        SYS_RGB.set_RGB(0x10, 0x10, 0x10, 0);
+                        SYS_RGB.set_RGB(0xf9, 0xa8, 0x46, 0);
                     else
                         SYS_RGB.set_RGB(0x00, 0x00, 0x30, 0);
                     Motion_control_run(0);

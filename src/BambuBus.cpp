@@ -70,27 +70,27 @@ int get_now_filament_num()
 
 void reset_filament_meters(int num)
 {
-    data_save.filament[num / 4][num % 4].meters = 0;
+    data_save.filament[data_save.bmcu][num].meters = 0;
 }
 void add_filament_meters(int num, float meters)
 {
-    data_save.filament[num / 4][num % 4].meters += meters;
+    data_save.filament[data_save.bmcu][num].meters += meters;
 }
 float get_filament_meters(int num)
 {
-    return data_save.filament[num / 4][num % 4].meters;
+    return data_save.filament[data_save.bmcu][num].meters;
 }
 void set_filament_online(int num, bool if_online)
 {
     if (if_online)
-        data_save.filament[num / 4][num % 4].statu = online;
+        data_save.filament[data_save.bmcu][num].statu = online;
     else
-        data_save.filament[num / 4][num % 4].statu = offline;
+        data_save.filament[data_save.bmcu][num].statu = offline;
 }
 
 bool get_filament_online(int num)
 {
-    if (data_save.filament[num / 4][num % 4].statu == offline)
+    if (data_save.filament[data_save.bmcu][num].statu == offline)
     {
         return false;
     }
@@ -101,7 +101,7 @@ bool get_filament_online(int num)
 }
 void set_filament_motion(int num, _filament_motion_state_set motion)
 {
-    data_save.filament[num / 4][num % 4].motion_set = motion;
+    data_save.filament[data_save.bmcu][num].motion_set = motion;
 }
 
 void set_now_filament_num(int num)
@@ -111,7 +111,7 @@ void set_now_filament_num(int num)
 
 _filament_motion_state_set get_filament_motion(int num)
 {
-    return data_save.filament[num / 4][num % 4].motion_set;
+    return data_save.filament[data_save.bmcu][num].motion_set;
 }
 
 uint8_t buf_X[1000];
@@ -281,54 +281,54 @@ void BambuBus_init()
         data_save.filament[0][0].color_R = 0xFF;
         data_save.filament[0][0].color_G = 0x00;
         data_save.filament[0][0].color_B = 0x00;
-        data_save.filament[0][1].color_R = 0x00;
+        data_save.filament[0][1].color_R = 0xFF;
         data_save.filament[0][1].color_G = 0xFF;
-        data_save.filament[0][1].color_B = 0x00;
-        data_save.filament[0][2].color_R = 0x00;
-        data_save.filament[0][2].color_G = 0x00;
-        data_save.filament[0][2].color_B = 0xFF;
-        data_save.filament[0][3].color_R = 0x88;
-        data_save.filament[0][3].color_G = 0x88;
-        data_save.filament[0][3].color_B = 0x88;
+        data_save.filament[0][1].color_B = 0xFF;
+        data_save.filament[0][2].color_R = 0xF9;
+        data_save.filament[0][2].color_G = 0x8C;
+        data_save.filament[0][2].color_B = 0x36;
+        data_save.filament[0][3].color_R = 0x16;
+        data_save.filament[0][3].color_G = 0x16;
+        data_save.filament[0][3].color_B = 0x16;
 
-        data_save.filament[1][0].color_R = 0xC0;
-        data_save.filament[1][0].color_G = 0x20;
-        data_save.filament[1][0].color_B = 0x20;
-        data_save.filament[1][1].color_R = 0x20;
-        data_save.filament[1][1].color_G = 0xC0;
-        data_save.filament[1][1].color_B = 0x20;
-        data_save.filament[1][2].color_R = 0x20;
-        data_save.filament[1][2].color_G = 0x20;
-        data_save.filament[1][2].color_B = 0xC0;
-        data_save.filament[1][3].color_R = 0x60;
-        data_save.filament[1][3].color_G = 0x60;
-        data_save.filament[1][3].color_B = 0x60;
+        data_save.filament[1][0].color_R = 0x89;
+        data_save.filament[1][0].color_G = 0x89;
+        data_save.filament[1][0].color_B = 0x89;
+        data_save.filament[1][1].color_R = 0x05;
+        data_save.filament[1][1].color_G = 0x77;
+        data_save.filament[1][1].color_B = 0x48;
+        data_save.filament[1][2].color_R = 0x0A;
+        data_save.filament[1][2].color_G = 0xCC;
+        data_save.filament[1][2].color_B = 0x38;
+        data_save.filament[1][3].color_R = 0xA0;
+        data_save.filament[1][3].color_G = 0x3C;
+        data_save.filament[1][3].color_B = 0xF7;
 
-        data_save.filament[2][0].color_R = 0x80;
-        data_save.filament[2][0].color_G = 0x40;
-        data_save.filament[2][0].color_B = 0x40;
-        data_save.filament[2][1].color_R = 0x40;
-        data_save.filament[2][1].color_G = 0x80;
-        data_save.filament[2][1].color_B = 0x40;
-        data_save.filament[2][2].color_R = 0x40;
-        data_save.filament[2][2].color_G = 0x40;
-        data_save.filament[2][2].color_B = 0x80;
-        data_save.filament[2][3].color_R = 0x40;
-        data_save.filament[2][3].color_G = 0x40;
-        data_save.filament[2][3].color_B = 0x40;
+        data_save.filament[2][0].color_R = 0x79;
+        data_save.filament[2][0].color_G = 0xD9;
+        data_save.filament[2][0].color_B = 0xF4;
+        data_save.filament[2][1].color_R = 0xF9;
+        data_save.filament[2][1].color_G = 0x5D;
+        data_save.filament[2][1].color_B = 0x73;
+        data_save.filament[2][2].color_R = 0x00;
+        data_save.filament[2][2].color_G = 0x00;
+        data_save.filament[2][2].color_B = 0xFF;
+        data_save.filament[2][3].color_R = 0xD3;
+        data_save.filament[2][3].color_G = 0xC5;
+        data_save.filament[2][3].color_B = 0xA2;
 
-        data_save.filament[3][0].color_R = 0x40;
-        data_save.filament[3][0].color_G = 0x20;
-        data_save.filament[3][0].color_B = 0x20;
-        data_save.filament[3][1].color_R = 0x20;
-        data_save.filament[3][1].color_G = 0x40;
-        data_save.filament[3][1].color_B = 0x20;
-        data_save.filament[3][2].color_R = 0x20;
-        data_save.filament[3][2].color_G = 0x20;
-        data_save.filament[3][2].color_B = 0x40;
-        data_save.filament[3][3].color_R = 0x20;
-        data_save.filament[3][3].color_G = 0x20;
-        data_save.filament[3][3].color_B = 0x20;
+        data_save.filament[3][0].color_R = 0xF9;
+        data_save.filament[3][0].color_G = 0xA8;
+        data_save.filament[3][0].color_B = 0x46;
+        data_save.filament[3][1].color_R = 0x0E;
+        data_save.filament[3][1].color_G = 0xE2;
+        data_save.filament[3][1].color_B = 0xA0;
+        data_save.filament[3][2].color_R = 0xFF;
+        data_save.filament[3][2].color_G = 0xF1;
+        data_save.filament[3][2].color_B = 0x44;
+        data_save.filament[3][3].color_R = 0xE0;
+        data_save.filament[3][3].color_G = 0xE0;
+        data_save.filament[3][3].color_B = 0xE0;
     }
     for (auto &i : data_save.filament)
     {
@@ -515,7 +515,7 @@ void set_motion_res_datas(unsigned char *set_buf, unsigned char AMS_num)
         int m = i + 2;
         meters = data_save.filament[AMS_num][i].meters;
         //pressure = data_save.filament[AMS_num][read_num].pressure;
-        if ((data_save.filament[AMS_num][i].motion_set == idle)|| (data_save.filament[AMS_num][i].motion_set == need_pull_back)) // idle or pull back
+        if ((data_save.filament[AMS_num][i].motion_set == idle) || (data_save.filament[AMS_num][i].motion_set == need_pull_back)) // idle or pull back
         {
             flagx = 0x00;
         }
@@ -600,8 +600,8 @@ bool set_motion(unsigned char AMS_num, unsigned char read_num, unsigned char sta
         {
             for (int i = 0; i < 4; i++)
             {
-                if (data_save.filament[AMS_num][i].motion_set != on_use)
-                    data_save.filament[AMS_num][i].motion_set = idle;
+                //if (data_save.filament[AMS_num][i].motion_set != on_use)
+                   // data_save.filament[AMS_num][i].motion_set = idle;
             }
         }
     }
@@ -666,14 +666,13 @@ void send_for_Cxx(unsigned char *buf, int length)
     if (!set_motion(AMS_num, read_num, statu_flags, fliment_motion_flag))
         return;
     
-    if (package_num != 3 || package_num != 8)
+    if (package_num == 2 || package_num == 5 || package_num == 8)
     {
-        package_num++;
-        return;
+        set_motion_res_datas(Cxx_res + 2, AMS_num);
+        package_send_with_crc(Cxx_res, sizeof(Cxx_res));
     }
 
-    set_motion_res_datas(Cxx_res + 2, AMS_num);
-    package_send_with_crc(Cxx_res, sizeof(Cxx_res));
+
     if (package_num < 20)
         package_num++;
     else
@@ -735,8 +734,8 @@ uint8_t filament_flag_detected = 0;
 
 void send_for_Dxx(unsigned char *buf, int length)
 {
-    unsigned char filament_flag_on = 0x00;
-    unsigned char filament_flag_NFC = 0x00;
+    //unsigned char filament_flag_on = 0x00;
+    //unsigned char filament_flag_NFC = 0x00;
     unsigned char AMS_num = buf[5];
     unsigned char statu_flags = buf[6];
     unsigned char fliment_motion_flag = buf[7];
@@ -768,18 +767,10 @@ void send_for_Dxx(unsigned char *buf, int length)
         need_res_for_06 = false;
     }
     else*/
-    if (package_num != 2 || package_num != 5)
-    {
-        package_num++;
-        return;
-    }
-    
-
 
     set_motion_res_datas(Dxx_res + 2, AMS_num);
-
     package_send_with_crc(Dxx_res, sizeof(Dxx_res));
-    if (package_num < 18)
+    if (package_num < 20)
         package_num++;
     else
         package_num = 0;

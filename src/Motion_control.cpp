@@ -155,7 +155,7 @@ public:
         }       
         if (motion == 1) // send 370 40  130 15
         {
-            speed_set = 40;
+            speed_set = 30;
         }
         else if (motion == 2) // over pressure
         {
@@ -163,7 +163,7 @@ public:
         }
         else if (motion == -3) // slowly pull
         {
-            speed_set = -60;
+            speed_set = -40;
         }
         else if (motion == -1 || motion == -2) // pull 370 70 130 18
         {
@@ -175,14 +175,14 @@ public:
         }
         else if (motion == -100) // slowly pull 370 15 130 10
         { 
-            speed_set = -50;
+            speed_set = -30;
         }
 
         float x = PID.caculate(now_speed - speed_set, (float)(time_now - time_last) / 1000);
         if (x > 5)
-            x += 350;
+            x += 400;
         else if (x < 5)
-            x -= 350;
+            x -= 400;
         else
             x = 0;
         if (x > PWM_lim)
@@ -558,6 +558,7 @@ void motor_motion_run()
 
 }
 bool bmcuset_en = false;
+uint64_t time_bmcuset = 0;
 bool Bmcu_set()
 {
     return bmcuset_en;
@@ -569,7 +570,6 @@ void Motion_control_run(int error)
 
     AS5600_distance_updata();
     uint64_t time_now = get_time64();
-    uint64_t time_bmcuset = 0;
 
     for (int i = 0; i < 4; i++)
     {
@@ -583,7 +583,7 @@ void Motion_control_run(int error)
             set_filament_online(i, false);
         }      
     }
-    if (!Bmcucheck())
+    if (!Bmcucheck() && time_bmcuset == 0)
     {
         time_bmcuset = time_now + 10000;
     }
@@ -598,14 +598,14 @@ void Motion_control_run(int error)
         uint8_t num = 0;
         for (int i = 1; i < 5; i++)
         {
-            if (PULL_key_stu[i-1] == 0 || ONLINE_key_change[i-1] == 0)
+            if (PULL_key_stu[i-1] == 1 && ONLINE_key_change[i-1] == 1)
                 num += i;
         }
 
         if (time_bmcuset > time_now && time_bmcuset < time_now + 2000 && num != 0)
         {
             Bmcu_set_num(num - 1);
-            time_bmcuset = time_now;
+            time_bmcuset = 0;
         }
         
     }
