@@ -54,7 +54,7 @@ uint8_t T_to_tangle(uint32_t time)
     else
         return time * 2;
 }
-unsigned char error_times = 0;
+
 void loop()
 {
 
@@ -62,33 +62,42 @@ void loop()
     {
         package_type stu = BambuBus_run();
 
-        // int stu =-1;
+        static int error = 0;
+        static uint64_t motion_run = 0;
+        uint64_t time_now = get_time64();
         if (stu!=BambuBus_package_NONE)//have data/offline
         {
+
             if (stu == BambuBus_package_ERROR)//offline
             {
-                Motion_control_run(-1);
+                error = -1;
                 SYS_RGB.set_RGB(0x30, 0x00, 0x00, 0);
-                error_times++;
-                error_times = error_times % 100;
-                if(error_times == 99)
-                    RGB_update();
-                delayMicroseconds(1000);
+                RGB_update();
             }
             else//have data
             {
-                error_times = 0;
+
                 if (stu == BambuBus_package_heartbeat)
                 {
+                    error = 0;
                     if(Bmcu_set())
                         SYS_RGB.set_RGB(0xf9, 0xa8, 0x46, 0);
                     else
                         SYS_RGB.set_RGB(0x00, 0x00, 0x30, 0);
-                    Motion_control_run(0);
+    
                     RGB_update();
                 }
                 
             }
+            
+            if (motion_run < time_now || time_now < 500)
+            {
+                Motion_control_run(error);
+                motion_run = time_now + 30;
+            }
+
+            if (Motor_need_to_save())
+               Motor_save();
         }
     }
 }

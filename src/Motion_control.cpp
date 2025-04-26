@@ -1,5 +1,15 @@
 #include "Motion_control.h"
 
+#define BMCUMotor_version 1
+#define use_flash_addr ((uint32_t)0x0800FA00)
+struct alignas(4) Motor_save_struct
+{
+    uint32_t version = BMCUMotor_version;
+    int pwm_zero[4] = {380, 380, 380, 380};
+    uint64_t time_pull = 12000;
+
+} motor_save;
+
 void MC_PWM_init()
 {
     GPIO_InitTypeDef GPIO_InitStructure;
@@ -69,7 +79,7 @@ public:
     //float I = 1;
     float I = 10;
     //float D = 0;
-    float D = 0.001;
+    float D = 0.0005;
     float I_save = 0;
     float E_last = 0;
     float pid_MAX = PWM_lim;
@@ -108,6 +118,7 @@ class _MOTOR_CONTROL
 public:
     int motion = 0;
     int CHx = 0;
+    int pwm_zero = 380;
     uint64_t motor_stop_time = 0;
     MOTOR_PID PID;
 
@@ -126,6 +137,10 @@ public:
     int get_motion()
     {
         return motion;
+    }
+    void set_pwm_zero(int _pwm_zero)
+    {
+        pwm_zero = _pwm_zero;
     }
     void run(float now_speed)
     {
@@ -155,7 +170,7 @@ public:
         }       
         if (motion == 1) // send 370 40  130 15
         {
-            speed_set = 30;
+            speed_set = 40;
         }
         else if (motion == 2) // over pressure
         {
@@ -163,7 +178,7 @@ public:
         }
         else if (motion == -3) // slowly pull
         {
-            speed_set = -40;
+            speed_set = -30;
         }
         else if (motion == -1 || motion == -2) // pull 370 70 130 18
         {
@@ -171,18 +186,18 @@ public:
         }
         else if (motion == 100) // slowly send 370 15 130 10
         { 
-            speed_set = 12;
+            speed_set = 15;
         }
         else if (motion == -100) // slowly pull 370 15 130 10
         { 
-            speed_set = -30;
+            speed_set = -40;
         }
 
         float x = PID.caculate(now_speed - speed_set, (float)(time_now - time_last) / 1000);
-        if (x > 5)
-            x += 400;
-        else if (x < 5)
-            x -= 400;
+        if (x > 1)
+            x += pwm_zero;
+        else if (x < -1)
+            x -= pwm_zero;
         else
             x = 0;
         if (x > PWM_lim)
@@ -315,26 +330,121 @@ AS5600_soft_IIC_many MC_AS5600;
 // uint32_t AS5600_SDA[] = {PA1, PA3, PA5, PA7};
 uint32_t AS5600_SCL[] = {PA6, PA4, PA2, PA0};
 uint32_t AS5600_SDA[] = {PA7, PA5, PA3, PA1};
+
+
+void MOTOR_get_pwm_zero()
+{
+    int pwm_zero[4] = {0, 0, 0, 0};
+    MC_AS5600.updata_angle();
+
+    int16_t last_angle[4];
+    for (int index = 0; index < 4; index++)
+    {
+        last_angle[index] = MC_AS5600.raw_angle[index];
+    }
+    for (int pwm = 200; pwm < 1000; pwm += 20)
+    {
+        MC_AS5600.updata_angle();
+        for (int index = 0; index < 4; index++)
+        {
+
+            if (pwm_zero[index] == 0)
+            {
+                if (abs(MC_AS5600.raw_angle[index] - last_angle[index]) > 50)
+                {
+                    pwm_zero[index] = pwm - 30;
+                    Motion_control_set_PWM(index, 0);
+                }
+                else if ((MC_AS5600.online[index] == true))
+                {
+                    Motion_control_set_PWM(index, -pwm);
+                }
+            }
+            else
+            {
+                Motion_control_set_PWM(index, 0);
+            }
+            delay(200);
+        }
+        delay(200);
+    }
+    for (int index = 0; index < 4; index++)
+    {
+        Motion_control_set_PWM(index, 0);
+        MOTOR_CONTROL[index].set_pwm_zero(pwm_zero[index]);
+    }
+}
+
+void MOTOR_set_pwm_zero(int pwm)
+{
+    motor_save.pwm_zero[0] = pwm;
+    motor_save.pwm_zero[1] = pwm;
+    motor_save.pwm_zero[2] = pwm;
+    motor_save.pwm_zero[3] = pwm;
+    for (int index = 0; index < 4; index++)
+    {
+        Motion_control_set_PWM(index, 0);
+        MOTOR_CONTROL[index].set_pwm_zero(motor_save.pwm_zero[index]);
+    }
+}
+
+bool Motor_read()
+{
+    Motor_save_struct *ptr = (Motor_save_struct *)(use_flash_addr);
+    if (ptr->version == BMCUMotor_version)
+    {
+        memcpy(&motor_save, ptr, sizeof(motor_save));
+        return true;
+    }
+    return false;
+}
+bool motor_need_to_save = false;
+void Motor_set_need_to_save()
+{
+    motor_need_to_save = true;
+}
+void Motor_save()
+{
+    Flash_saves(&motor_save, sizeof(motor_save), use_flash_addr);
+    motor_need_to_save = false;
+}
+bool Motor_need_to_save()
+{
+    return motor_need_to_save;
+}
+
+void Motor_init()
+{
+    bool _init_ready = Motor_read();
+    if (!_init_ready)
+    {
+        motor_save.pwm_zero[0] = 380;
+        motor_save.pwm_zero[1] = 380;
+        motor_save.pwm_zero[2] = 380;
+        motor_save.pwm_zero[3] = 380;
+        motor_save.time_pull = 12000;
+        Motor_save();
+    }
+
+    for (int index = 0; index < 4; index++)
+    {
+        Motion_control_set_PWM(index, 0);
+        MOTOR_CONTROL[index].set_pwm_zero(motor_save.pwm_zero[index]);
+    }
+}
+
+
 void Motion_control_init()
 {
     MC_PWM_init();
     MC_PULL_key_init();
     MC_ONLINE_key_init();
     MC_AS5600.init(AS5600_SCL, AS5600_SDA, 4);
-    /*for (auto i : MOTOR_CONTROL)
-    {
-        i.stu = 0;
-        i.set_stop_time = 0;
-    }*/
-    /*for (auto i : motor_caculate_PID)
-    {
-        i.P = 30;
-        i.I = 0.1;
-        i.D = 0;
-    }*/
+    Motor_init();
+
 }
 #define AS5600_PI 3.1415926535897932384626433832795
-#define speed_filter_k 1
+#define speed_filter_k 30
 float speed_as5600[4] = {0, 0, 0, 0};
 void AS5600_distance_updata()
 {
@@ -370,8 +480,8 @@ void AS5600_distance_updata()
         float speedx = distance_E / T * 1000;
         T = speed_filter_k / (T + speed_filter_k);
         speed_as5600[i] = speedx * (1 - T) + speed_as5600[i] * T; // mm/s
-        if (get_filament_motion(i) == on_use)
-            add_filament_meters(i, distance_E / 1000);
+        //if (get_filament_motion(i) == on_use)
+        add_filament_meters(i, distance_E / 1000);
     }
     time_last = time_now;
 }
@@ -425,31 +535,38 @@ bool Bmcucheck()
     return false;
 }
 uint8_t lastnum = 0;
+
+
+void MOTOR_set_time_pull(uint64_t time1)
+{
+    motor_save.time_pull = time1;
+}
+
 void motor_motion_run()
 {  
 
     uint8_t num = get_now_filament_num();
     uint64_t time_now = get_time64();
     //uint64_t time_set = time_now + 18000;
-    uint64_t time_set_2 = time_now + 11500;  
+    uint64_t time_set_2 = time_now + motor_save.time_pull;  
     uint64_t time_set_3 = time_now + 5000;
 
+    
+    if (!Pullcheck(num))
     {
-        if (!Pullcheck(num))
-        {
-            senddelay_count[num] = 1;
-            pulldelay_count[num] = 1;
-        }       
-        if (num != lastnum)
-        {
-            if (pullcheck[lastnum] == 2)
-                MOTOR_CONTROL[lastnum].set_motion(-1, 1000 * 12);   //短回抽通道 退料
-            Sendcount_clear(lastnum);
-            Pullcount_clear(lastnum);
-            lastnum = num;
-            Pullcheck_clear();
-        }    
-    }
+        senddelay_count[num] = 1;
+        pulldelay_count[num] = 1;
+    }       
+    if (num != lastnum)
+    {
+        if (pullcheck[lastnum] == 2)
+            MOTOR_CONTROL[lastnum].set_motion(-1, motor_save.time_pull - 1000);   //短回抽通道 退料
+        Sendcount_clear(lastnum);
+        Pullcount_clear(lastnum);
+        lastnum = num;
+        Pullcheck_clear();
+    }    
+    
     if (Bmcu_reset())
     {
         for (int i = 0; i < 4; i++)
@@ -457,7 +574,7 @@ void motor_motion_run()
             if (pullcheck[i] == 2)
             {   
                 if (get_filament_motion(i) == idle)
-                    MOTOR_CONTROL[i].set_motion(-1, 1000 * 12);   //所有通道退回五通后
+                    MOTOR_CONTROL[i].set_motion(-1, motor_save.time_pull - 1000);   //所有通道退回五通后
             }    
         }        
         Pullcheck_clear();
@@ -473,13 +590,16 @@ void motor_motion_run()
             if (senddelay_count[num] < time_now )
             {
             //if (sendcheck_count[num] == 0)
-                sendcheck_count[num] = 0;
+                
             //if (sendcheck_count[num] > time_now && ONLINE_key_change[num] == 0)
             if (ONLINE_key_change[num] == 0)
+            {
                 MOTOR_CONTROL[num].set_motion(1, 100);
+                sendcheck_count[num] = 0;
+            }
             else
             {    
-                MOTOR_CONTROL[num].set_motion(2, 100);
+                MOTOR_CONTROL[num].set_motion(99, 100);
             }
             }
             if (ONLINE_key_change[num] == 1 && sendcheck_count[num] == 0)       //进料重试
@@ -487,7 +607,7 @@ void motor_motion_run()
                 send_count[num] = time_now + 2000;
                 sendcheck_count[num] = 1;
             }
-            if (send_count[num] > time_now)
+            if (send_count[num] > time_now && send_count[num] < time_now + 1500)
             {
                 MOTOR_CONTROL[num].set_motion(-3, 100);
             }
@@ -498,7 +618,7 @@ void motor_motion_run()
                 pulldelay_count[num] = time_set_3;
             if (pulldelay_count[num] > time_now)
             {
-                MOTOR_CONTROL[num].set_motion(-1, 1000 * 13);   //退料时间调整
+                MOTOR_CONTROL[num].set_motion(-1, motor_save.time_pull);   //退料时间调整
             } 
             else
             {
@@ -514,7 +634,7 @@ void motor_motion_run()
                 if(pullcheck_count[num] < time_now - 5000)
                 {
                     pullcheck_count[num] = 0;
-                    //set_filament_motion(num, idle);                      //防止卡回抽状态
+                    set_filament_motion(num, idle);                      //防止卡回抽状态
                 }
             }
             }           
@@ -523,7 +643,7 @@ void motor_motion_run()
             Pullcount_clear(num);                //注销 短回抽
             if (MOTOR_CONTROL[num].get_motion() == 1) 
             {
-                MOTOR_CONTROL[num].set_motion(99, 50);    //停电机 清空pid
+                MOTOR_CONTROL[num].set_motion(99, 150);    //停电机 清空pid
             }
             else if (MOTOR_CONTROL[num].get_motion() == 99)   
             {
