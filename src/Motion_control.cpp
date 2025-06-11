@@ -32,7 +32,7 @@ void MC_PWM_init()
 
     // 定时器基础配置
     TIM_TimeBaseStructure.TIM_Period = 999;  // 周期
-    TIM_TimeBaseStructure.TIM_Prescaler = 3; // 预分频
+    TIM_TimeBaseStructure.TIM_Prescaler = 1; // 预分频
     TIM_TimeBaseStructure.TIM_ClockDivision = 0;
     TIM_TimeBaseStructure.TIM_CounterMode = TIM_CounterMode_Up;
     TIM_TimeBaseInit(TIM2, &TIM_TimeBaseStructure);
@@ -55,7 +55,7 @@ void MC_PWM_init()
 
     GPIO_PinRemapConfig(GPIO_FullRemap_TIM2, ENABLE);    // TIM2完全映射-CH1-PA15/CH2-PB3
     GPIO_PinRemapConfig(GPIO_PartialRemap_TIM3, ENABLE); // TIM3部分映射-CH1-PB4/CH2-PB5
-    // GPIO_PinRemapConfig(GPIO_Remap_TIM4, ENABLE);//TIM4不映射-CH1-PB6/CH2-PB7/CH3-PB8/CH4-PB9
+    GPIO_PinRemapConfig(GPIO_Remap_TIM4, DISABLE);//TIM4不映射-CH1-PB6/CH2-PB7/CH3-PB8/CH4-PB9
 
     TIM_CtrlPWMOutputs(TIM2, ENABLE);
     TIM_ARRPreloadConfig(TIM2, ENABLE);
@@ -79,7 +79,7 @@ public:
     //float I = 1;
     float I = 10;
     //float D = 0;
-    float D = 0.0005;
+    float D = 0.018;
     float I_save = 0;
     float E_last = 0;
     float pid_MAX = PWM_lim;
@@ -196,7 +196,7 @@ public:
         float x = PID.caculate(now_speed - speed_set, (float)(time_now - time_last) / 1000);
         if (x > 1)
             x += pwm_zero;
-        else if (x < -1)
+        else if (x < 1)
             x -= pwm_zero;
         else
             x = 0;
@@ -352,21 +352,22 @@ void MOTOR_get_pwm_zero()
             {
                 if (abs(MC_AS5600.raw_angle[index] - last_angle[index]) > 50)
                 {
-                    pwm_zero[index] = pwm - 30;
+                    pwm_zero[index] = pwm - 50;
                     Motion_control_set_PWM(index, 0);
                 }
                 else if ((MC_AS5600.online[index] == true))
                 {
-                    Motion_control_set_PWM(index, -pwm);
+                    Motion_control_set_PWM(index, pwm);
                 }
+                last_angle[index] = MC_AS5600.raw_angle[index];
             }
             else
             {
                 Motion_control_set_PWM(index, 0);
             }
-            delay(200);
+            delay(10);
         }
-        delay(200);
+        delay(50);
     }
     for (int index = 0; index < 4; index++)
     {
@@ -444,7 +445,7 @@ void Motion_control_init()
 
 }
 #define AS5600_PI 3.1415926535897932384626433832795
-#define speed_filter_k 30
+#define speed_filter_k 10
 float speed_as5600[4] = {0, 0, 0, 0};
 void AS5600_distance_updata()
 {
@@ -518,7 +519,7 @@ bool Pullcheck(uint8_t CHx)
     {
         if (CHx != i)
         {
-            if (pullcheck[i] != 0 || pullcheck[CHx] == 0)
+            if (pullcheck[i] != 0)
                 return true;  
         }
     }
@@ -549,18 +550,26 @@ void motor_motion_run()
     uint64_t time_now = get_time64();
     //uint64_t time_set = time_now + 18000;
     uint64_t time_set_2 = time_now + motor_save.time_pull;  
-    uint64_t time_set_3 = time_now + 5000;
-
-    
+    uint64_t time_set_3 = time_now + 8000;
+    uint64_t time_pull  = 500;
+    if (motor_save.time_pull > 14000)
+        time_pull  = motor_save.time_pull / 2;
     if (!Pullcheck(num))
     {
-        senddelay_count[num] = 1;
-        pulldelay_count[num] = 1;
+        if (senddelay_count[num] == 0)
+            senddelay_count[num] = 1;        
+        if (pullcheck[num] != 0 && pulldelay_count[num] == 0)
+            pulldelay_count[num] = 1;
     }       
     if (num != lastnum)
     {
         if (pullcheck[lastnum] == 2)
-            MOTOR_CONTROL[lastnum].set_motion(-1, motor_save.time_pull - 1000);   //短回抽通道 退料
+        {
+            if (MOTOR_CONTROL[lastnum].get_motion() == -2)
+                MOTOR_CONTROL[lastnum].set_motion(-1, motor_save.time_pull - 500);
+            else 
+                MOTOR_CONTROL[lastnum].set_motion(-1, motor_save.time_pull - time_pull);     //短回抽通道 退料
+        }
         Sendcount_clear(lastnum);
         Pullcount_clear(lastnum);
         lastnum = num;
@@ -574,7 +583,7 @@ void motor_motion_run()
             if (pullcheck[i] == 2)
             {   
                 if (get_filament_motion(i) == idle)
-                    MOTOR_CONTROL[i].set_motion(-1, motor_save.time_pull - 1000);   //所有通道退回五通后
+                    MOTOR_CONTROL[i].set_motion(-1, motor_save.time_pull - time_pull);   //所有通道退回五通后
             }    
         }        
         Pullcheck_clear();
@@ -587,6 +596,8 @@ void motor_motion_run()
             RGB_set(num, 0x00, 0xFF, 0x00);
             if (senddelay_count[num] == 0)
                 senddelay_count[num] = time_set_2;
+            else if (senddelay_count[num] == 1)
+                senddelay_count[num] = time_set_3;
             if (senddelay_count[num] < time_now )
             {
             //if (sendcheck_count[num] == 0)
@@ -602,15 +613,16 @@ void motor_motion_run()
                 MOTOR_CONTROL[num].set_motion(99, 100);
             }
             }
-            if (ONLINE_key_change[num] == 1 && sendcheck_count[num] == 0)       //进料重试
-            {
-                send_count[num] = time_now + 2000;
-                sendcheck_count[num] = 1;
-            }
             if (send_count[num] > time_now && send_count[num] < time_now + 1500)
             {
                 MOTOR_CONTROL[num].set_motion(-3, 100);
             }
+            else if (ONLINE_key_change[num] == 1 && sendcheck_count[num] == 0)       //进料重试
+            {
+                send_count[num] = time_now + 2000;
+                sendcheck_count[num] = 1;
+            }
+
             break;
         case need_pull_back:
             RGB_set(num, 0xFF, 0x00, 0xFF);
@@ -626,7 +638,7 @@ void motor_motion_run()
                 pullcheck_count[num] = time_set_3;
             if (pullcheck_count[num] > time_now)
             {
-                MOTOR_CONTROL[num].set_motion(-2, 500);
+                MOTOR_CONTROL[num].set_motion(-2, time_pull);
             }  
             else
             {
@@ -679,6 +691,7 @@ void motor_motion_run()
 }
 bool bmcuset_en = false;
 uint64_t time_bmcuset = 0;
+uint64_t time_led = 0;
 bool Bmcu_set()
 {
     return bmcuset_en;
@@ -730,6 +743,9 @@ void Motion_control_run(int error)
         
     }
     
+    if (time_now > time_led)
+    {
+        time_led = time_now + 500;
 
     if (error)
     {
@@ -755,13 +771,17 @@ void Motion_control_run(int error)
         }
     }
     else
+    {
         for (int i = 0; i < 4; i++)
+        {
             if(get_filament_online(i))
-                if(get_filament_online(i))
                 RGB_set(i, 0x00, 0x00, 0x37);
             else
                 RGB_set(i, 0x37, 0x00, 0x00);
-            else
-                RGB_set(i, 0x37, 0x00, 0x00);
+        }
+
+    }
+    }
+
     motor_motion_run();
 }

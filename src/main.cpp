@@ -55,6 +55,9 @@ uint8_t T_to_tangle(uint32_t time)
         return time * 2;
 }
 
+
+int error = 0;
+uint64_t motion_run = 0;
 void loop()
 {
 
@@ -62,9 +65,7 @@ void loop()
     {
         package_type stu = BambuBus_run();
 
-        static int error = 0;
-        static uint64_t motion_run = 0;
-        uint64_t time_now = get_time64();
+        
         if (stu!=BambuBus_package_NONE)//have data/offline
         {
 
@@ -76,7 +77,7 @@ void loop()
             }
             else//have data
             {
-
+                uint64_t time_now = get_time64();
                 if (stu == BambuBus_package_heartbeat)
                 {
                     error = 0;
@@ -87,14 +88,16 @@ void loop()
     
                     RGB_update();
                 }
+
+                if (motion_run < time_now)
+                {
+                   Motion_control_run(error);
+                   motion_run = time_now + 30;
+                }
                 
             }
             
-            if (motion_run < time_now || time_now < 500)
-            {
-                Motion_control_run(error);
-                motion_run = time_now + 30;
-            }
+
 
             if (Motor_need_to_save())
                Motor_save();
