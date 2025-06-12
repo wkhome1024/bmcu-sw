@@ -178,7 +178,7 @@ public:
         }
         else if (motion == -3) // slowly pull
         {
-            speed_set = -30;
+            speed_set = -40;
         }
         else if (motion == -1 || motion == -2) // pull 370 70 130 18
         {
@@ -613,13 +613,13 @@ void motor_motion_run()
                 MOTOR_CONTROL[num].set_motion(99, 100);
             }
             }
-            if (send_count[num] > time_now && send_count[num] < time_now + 1500)
+            if (send_count[num] > time_now && send_count[num] < time_now + 2500)
             {
                 MOTOR_CONTROL[num].set_motion(-3, 100);
             }
             else if (ONLINE_key_change[num] == 1 && sendcheck_count[num] == 0)       //进料重试
             {
-                send_count[num] = time_now + 2000;
+                send_count[num] = time_now + 3500;
                 sendcheck_count[num] = 1;
             }
 
