@@ -575,12 +575,12 @@ bool set_motion(unsigned char AMS_num, unsigned char read_num, unsigned char sta
                 _filament *filament = &(data_save.filament[data_save.bmcu][data_save.BambuBus_now_filament_num]);
                 if (data_save.BambuBus_now_filament_num < 4)
                 {
-                    if (filament->motion_set == on_use)
+                    if (filament->motion_set == on_use || filament->motion_set == idle)
                         filament->motion_set = need_pull_back;
                     filament->pressure = 0x4700;
                 }
             }
-            else
+            else if ((statu_flags == 0x01) && (fliment_motion_flag == 0x00)) // 01 00(FF)
             {
                 for (auto i = 0; i < 4; i++)
                 {
@@ -1107,7 +1107,7 @@ void send_for_Set_filament(unsigned char *buf, int length)
     uint8_t command_2 = buf[6];
     uint8_t t = 0;
     if(BambuBus_address  == 0x0700)
-        t = 15;
+        t = 13;
     if (command_1 == 0xE0)
        bmcu_reset = true;
    
@@ -1189,7 +1189,7 @@ package_type BambuBus_run()
         case BambuBus_package_filament_motion_short:
             send_for_Cxx(buf_X, data_length);
             save_s = true;
-            time_motion_r = timex + 300000;
+            time_motion_r = timex + 3000;
             break;
         case BambuBus_package_filament_motion_long:
             send_for_Dxx(buf_X, data_length);
