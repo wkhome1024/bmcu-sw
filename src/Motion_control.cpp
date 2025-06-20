@@ -134,6 +134,11 @@ public:
         motor_stop_time = time_now + over_time;
         motion = _motion;
     }
+    void set_motion_add(int _motion, uint64_t over_time)
+    {
+        motor_stop_time = motor_stop_time + over_time;
+        motion = _motion;
+    }
     int get_motion()
     {
         return motion;
@@ -481,8 +486,8 @@ void AS5600_distance_updata()
         float speedx = distance_E / T * 1000;
         T = speed_filter_k / (T + speed_filter_k);
         speed_as5600[i] = speedx * (1 - T) + speed_as5600[i] * T; // mm/s
-        //if (get_filament_motion(i) == on_use)
-        add_filament_meters(i, distance_E / 1000);
+        if (get_filament_motion(i) != on_use || distance_E > 0)       
+            add_filament_meters(i, distance_E / 1000);
     }
     time_last = time_now;
 }
@@ -547,18 +552,21 @@ void motor_motion_run()
 {  
 
     uint8_t num = get_now_filament_num();
+    if (num == 0xFF)
+        return;
     uint64_t time_now = get_time64();
-    //uint64_t time_set = time_now + 18000;
-    uint64_t time_set_2 = time_now + motor_save.time_pull;  
-    uint64_t time_set_3 = time_now + 8000;
     uint64_t time_pull  = 500;
     if (motor_save.time_pull > 14000)
         time_pull  = motor_save.time_pull / 2;
+    uint64_t time_set = motor_save.time_pull - time_pull;
+    uint64_t time_set_2 = time_now + time_set;  
+    uint64_t time_set_3 = time_now + 5000;
+
     if (!Pullcheck(num))
     {
         if (senddelay_count[num] == 0)
             senddelay_count[num] = 1;        
-        if (pullcheck[num] != 0 && pulldelay_count[num] == 0)
+        if (pulldelay_count[num] == 0)
             pulldelay_count[num] = 1;
     }       
     if (num != lastnum)
@@ -566,9 +574,9 @@ void motor_motion_run()
         if (pullcheck[lastnum] == 2)
         {
             if (MOTOR_CONTROL[lastnum].get_motion() == -2)
-                MOTOR_CONTROL[lastnum].set_motion(-1, motor_save.time_pull - 500);
-            else 
-                MOTOR_CONTROL[lastnum].set_motion(-1, motor_save.time_pull - time_pull);     //短回抽通道 退料
+                MOTOR_CONTROL[lastnum].set_motion_add(-1, time_set);     //短回抽通道 退料
+            else if (MOTOR_CONTROL[lastnum].get_motion() == 0)
+                MOTOR_CONTROL[lastnum].set_motion(-1, time_set);
         }
         Sendcount_clear(lastnum);
         Pullcount_clear(lastnum);
@@ -583,7 +591,7 @@ void motor_motion_run()
             if (pullcheck[i] == 2)
             {   
                 if (get_filament_motion(i) == idle)
-                    MOTOR_CONTROL[i].set_motion(-1, motor_save.time_pull - time_pull);   //所有通道退回五通后
+                    MOTOR_CONTROL[i].set_motion(-1, time_set);   //所有通道退回五通后
             }    
         }        
         Pullcheck_clear();
@@ -613,13 +621,13 @@ void motor_motion_run()
                 MOTOR_CONTROL[num].set_motion(99, 100);
             }
             }
-            if (send_count[num] > time_now && send_count[num] < time_now + 2500)
+            if (send_count[num] > time_now && send_count[num] < time_now + 1500)
             {
                 MOTOR_CONTROL[num].set_motion(-3, 100);
             }
             else if (ONLINE_key_change[num] == 1 && sendcheck_count[num] == 0)       //进料重试
             {
-                send_count[num] = time_now + 3500;
+                send_count[num] = time_now + 2500;
                 sendcheck_count[num] = 1;
             }
 
@@ -627,7 +635,7 @@ void motor_motion_run()
         case need_pull_back:
             RGB_set(num, 0xFF, 0x00, 0xFF);
             if (pulldelay_count[num] == 0)
-                pulldelay_count[num] = time_set_3;
+                pulldelay_count[num] = time_set_3 + 3000;
             if (pulldelay_count[num] > time_now)
             {
                 MOTOR_CONTROL[num].set_motion(-1, motor_save.time_pull);   //退料时间调整
@@ -635,7 +643,7 @@ void motor_motion_run()
             else
             {
             if (pullcheck_count[num] == 0)
-                pullcheck_count[num] = time_set_3;
+                pullcheck_count[num] = time_set_3 + 3000;
             if (pullcheck_count[num] > time_now)
             {
                 MOTOR_CONTROL[num].set_motion(-2, time_pull);
@@ -743,10 +751,6 @@ void Motion_control_run(int error)
         
     }
     
-    if (time_now > time_led)
-    {
-        time_led = time_now + 500;
-
     if (error)
     {
         for (int i = 0; i < 4; i++)
@@ -780,7 +784,6 @@ void Motion_control_run(int error)
                 RGB_set(i, 0x37, 0x00, 0x00);
         }
 
-    }
     }
 
     motor_motion_run();

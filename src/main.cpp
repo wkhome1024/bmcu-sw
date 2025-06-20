@@ -58,6 +58,7 @@ uint8_t T_to_tangle(uint32_t time)
 
 int error = 0;
 uint64_t motion_run = 0;
+uint64_t led_time = 0;
 void loop()
 {
 
@@ -68,16 +69,15 @@ void loop()
         
         if (stu!=BambuBus_package_NONE)//have data/offline
         {
-
+            uint64_t time_now = get_time64();
             if (stu == BambuBus_package_ERROR)//offline
             {
                 error = -1;
                 SYS_RGB.set_RGB(0x30, 0x00, 0x00, 0);
-                RGB_update();
+                //RGB_update();
             }
             else//have data
             {
-                uint64_t time_now = get_time64();
                 if (stu == BambuBus_package_heartbeat)
                 {
                     error = 0;
@@ -86,7 +86,7 @@ void loop()
                     else
                         SYS_RGB.set_RGB(0x00, 0x00, 0x30, 0);
     
-                    RGB_update();
+                    //RGB_update();
                 }
 
                 if (motion_run < time_now)
@@ -96,8 +96,11 @@ void loop()
                 }
                 
             }
-            
-
+            if (led_time < time_now)
+            {
+                RGB_update();
+                led_time = time_now + 500;
+            }
 
             if (Motor_need_to_save())
                Motor_save();
