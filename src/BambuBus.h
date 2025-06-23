@@ -56,6 +56,7 @@ extern "C"
     void set_now_filament_num(int num);
     extern bool Bmcu_reset();
     extern void Bmcu_set_no_reset();
+    extern bool Bmcu_select();
     void Bmcu_set_num(uint8_t num);
 
 #ifdef __cplusplus

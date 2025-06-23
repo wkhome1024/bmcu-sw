@@ -10,6 +10,7 @@ uint16_t BambuBus_address = 0;
 uint8_t AMS_num = 1;
 bool bmcu_reset = false;
 bool Bmcu_filament_flag = false;
+bool Bmcu_select_flag = false;
 struct _filament
 {
     // AMS statu
@@ -481,7 +482,10 @@ void set_motion_res_datas(unsigned char *set_buf, unsigned char AMS_num, unsigne
     uint8_t flagx = 0x00;
     if (read_num != 0xFF)
     {
-        meters = data_save.filament[AMS_num][read_num].meters;
+        if (data_save.filament[AMS_num][read_num].meters >= 0)
+            meters = data_save.filament[AMS_num][read_num].meters;
+        else
+            data_save.filament[AMS_num][read_num].meters = 0;
     }
     // meters = data_save.filament[AMS_num][read_num].meters;
     memcpy(set_buf + 6, &meters, sizeof(meters));
@@ -575,7 +579,8 @@ bool set_motion(unsigned char AMS_num, unsigned char read_num, unsigned char sta
             {
                 for (auto i = 0; i < 4; i++)
                 {
-                    data_save.filament[AMS_num][i].motion_set = idle;
+                    if (data_save.filament[AMS_num][i].motion_set != on_use)
+                        data_save.filament[AMS_num][i].motion_set = idle;
                     data_save.filament[AMS_num][i].pressure = 0xFFFF;
                 }
             }
@@ -710,9 +715,14 @@ void send_for_Cxx(unsigned char *buf, int length)
     if (data_save.bmcu != AMS_num)
     {
         if (read_num < 4)
-            data_save.BambuBus_now_filament_num = 0xFF;
+            Bmcu_select_flag = false;
         return;
     }
+    else if (data_save.bmcu == AMS_num && !Bmcu_select_flag)
+    {
+        if (read_num < 4)
+            Bmcu_select_flag = true;
+    } 
 
     if (!set_motion(AMS_num, read_num, statu_flags, fliment_motion_flag))
         return;
@@ -813,7 +823,7 @@ void send_for_Dxx(unsigned char *buf, int length)
     {
         if (read_num != 0xFF)
         {
-            data_save.BambuBus_now_filament_num = 0xFF;
+            Bmcu_select_flag = false;
             for (int i = 0; i < 4; i++)
             {
                 if (data_save.filament[data_save.bmcu][i].motion_set == need_pull_back)
@@ -822,6 +832,11 @@ void send_for_Dxx(unsigned char *buf, int length)
         }
         return;
     }
+    else if (data_save.bmcu == AMS_num && !Bmcu_select_flag)
+    {
+        if (read_num < 4)
+            Bmcu_select_flag = true;
+    } 
 
     if (!set_motion(AMS_num, read_num, statu_flags, fliment_motion_flag))
         return;
@@ -1098,7 +1113,7 @@ void send_for_Set_filament(unsigned char *buf, int length)
     uint8_t command_1 = buf[5];
     uint8_t command_2 = buf[6];
     static uint8_t t = 0;
-    if (BambuBus_address == 0x0700 && t == 0)
+    if (BambuBus_address == 0x0700)
         t = 6;
     if (command_1 == 0xE0)
         bmcu_reset = true;
@@ -1129,14 +1144,8 @@ void send_for_Set_filament(unsigned char *buf, int length)
             MOTOR_set_pwm_zero(380);
         else if (command_2 == 0xD5 && read_num == 3) ////岩石灰  --电机pwm 设定
             MOTOR_set_pwm_zero(460);
-        else if (command_2 == 0xD7 && read_num == 0) ////灰色  --电机退料时间参数 --默认
-            t = 0;
-        else if (command_2 == 0xD7 && read_num == 1) ////灰色  --电机退料时间参数
-            t = 4;
-        else if (command_2 == 0xD7 && read_num == 2) ////灰色  --电机退料时间参数
-            t = 8;
-        else if (command_2 == 0xD7 && read_num == 3) ////灰色  --电机退料时间参数
-            t = 12;
+        else if (command_2 == 0xD7)               ////灰色  --电机标定
+            MOTOR_get_pwm_zero();
 
         Motor_set_need_to_save();
     }
@@ -1254,4 +1263,8 @@ void Bmcu_set_num(uint8_t num)
 {
     data_save.bmcu = num;
     Bambubus_need_to_save = true;
+}
+bool Bmcu_select()
+{
+    return Bmcu_select_flag;
 }

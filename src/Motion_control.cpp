@@ -136,7 +136,7 @@ public:
     }
     void set_motion_add(int _motion, uint64_t over_time)
     {
-        motor_stop_time = motor_stop_time + over_time;
+        motor_stop_time += over_time;
         motion = _motion;
     }
     int get_motion()
@@ -347,7 +347,7 @@ void MOTOR_get_pwm_zero()
     {
         last_angle[index] = MC_AS5600.raw_angle[index];
     }
-    for (int pwm = 200; pwm < 1000; pwm += 20)
+    for (int pwm = 200; pwm < 500; pwm += 20)
     {
         MC_AS5600.updata_angle();
         for (int index = 0; index < 4; index++)
@@ -355,9 +355,9 @@ void MOTOR_get_pwm_zero()
 
             if (pwm_zero[index] == 0)
             {
-                if (abs(MC_AS5600.raw_angle[index] - last_angle[index]) > 50)
+                if (abs(MC_AS5600.raw_angle[index] - last_angle[index]) > 20)
                 {
-                    pwm_zero[index] = pwm - 50;
+                    pwm_zero[index] = pwm - 80;
                     Motion_control_set_PWM(index, 0);
                 }
                 else if ((MC_AS5600.online[index] == true))
@@ -365,14 +365,18 @@ void MOTOR_get_pwm_zero()
                     Motion_control_set_PWM(index, pwm);
                 }
                 last_angle[index] = MC_AS5600.raw_angle[index];
+                if (pwm == 500)
+                {
+                    pwm_zero[index] = pwm - 20;
+                }
             }
             else
             {
                 Motion_control_set_PWM(index, 0);
             }
-            delay(10);
+            delay(20);
         }
-        delay(50);
+        delay(100);
     }
     for (int index = 0; index < 4; index++)
     {
@@ -550,10 +554,8 @@ void MOTOR_set_time_pull(uint64_t time1)
 
 void motor_motion_run()
 {  
-
+    bool select = Bmcu_select();
     uint8_t num = get_now_filament_num();
-    if (num == 0xFF)
-        return;
     uint64_t time_now = get_time64();
     uint64_t time_pull  = 500;
     if (motor_save.time_pull > 14000)
@@ -689,6 +691,11 @@ void motor_motion_run()
             RGB_set(num, 0x00, 0x00, 0x37);
             break;
         }
+    }
+    if (!select && MOTOR_CONTROL[num].get_motion() < 0)
+    {
+        Pullcheck_set(num , 2);
+        MOTOR_CONTROL[num].set_motion(0, 100);
     }
     for (int i = 0; i < 4; i++) {
         if(i != num)
