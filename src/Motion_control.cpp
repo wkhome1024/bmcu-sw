@@ -6,7 +6,7 @@ struct alignas(4) Motor_save_struct
 {
     uint32_t version = BMCUMotor_version;
     int pwm_zero[4] = {380, 380, 380, 380};
-    uint64_t time_pull = 12000;
+    uint64_t time_pull = 15000;
 
 } motor_save;
 
@@ -70,7 +70,7 @@ void MC_PWM_init()
 
 uint8_t PULL_key_stu[4] = {0, 0, 0, 0};
 uint8_t PULL_key_change[4] = {0, 0, 0, 0};
-#define PWM_lim 900
+#define PWM_lim 980
 
 class MOTOR_PID
 {
@@ -179,7 +179,7 @@ public:
         }
         else if (motion == 2) // over pressure
         {
-            speed_set = 2;
+            speed_set = 5;
         }
         else if (motion == -3) // slowly pull
         {
@@ -251,7 +251,7 @@ void MC_ONLINE_key_read(void)
 {
     uint8_t stu_read[4];
     uint64_t time_now = get_time64();
-    uint64_t time_set = time_now + 4000;
+    uint64_t time_set = time_now + 5000;
     //uint64_t time_set1 = time_now + 50;
     stu_read[0] = digitalRead(PD0);
     stu_read[1] = digitalRead(PC15);
@@ -623,13 +623,13 @@ void motor_motion_run()
                 MOTOR_CONTROL[num].set_motion(99, 100);
             }
             }
-            if (send_count[num] > time_now && send_count[num] < time_now + 1500)
+            if (send_count[num] > time_now && send_count[num] < time_now + 1000)
             {
                 MOTOR_CONTROL[num].set_motion(-3, 100);
             }
             else if (ONLINE_key_change[num] == 1 && sendcheck_count[num] == 0)       //进料重试
             {
-                send_count[num] = time_now + 2500;
+                send_count[num] = time_now + 2000;
                 sendcheck_count[num] = 1;
             }
 

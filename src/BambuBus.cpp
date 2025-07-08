@@ -36,7 +36,7 @@ struct alignas(4) flash_save_struct
 {
     _filament filament[4][4];
     int BambuBus_now_filament_num = 0;
-    uint8_t bmcu = 5;
+    uint8_t bmcu = 0;
     uint32_t version = Bambubus_version;
     uint32_t check = 0x40614061;
 } data_save;
@@ -210,7 +210,7 @@ void BambuBUS_UART_Init()
     GPIO_Init(GPIOA, &GPIO_InitStructure);
     GPIOA->BCR = GPIO_Pin_12;
 
-    USART_InitStructure.USART_BaudRate = 1250000;
+    USART_InitStructure.USART_BaudRate = 256000;
     USART_InitStructure.USART_WordLength = USART_WordLength_9b;
     USART_InitStructure.USART_StopBits = USART_StopBits_1;
     USART_InitStructure.USART_Parity = USART_Parity_Even;
@@ -482,7 +482,7 @@ void set_motion_res_datas(unsigned char *set_buf, unsigned char AMS_num, unsigne
     uint8_t flagx = 0x00;
     if (read_num != 0xFF)
     {
-        if (data_save.filament[AMS_num][read_num].meters >= 0)
+        if (data_save.filament[AMS_num][read_num].meters >= 0 && data_save.filament[AMS_num][read_num].meters < 600)
             meters = data_save.filament[AMS_num][read_num].meters;
         else
             data_save.filament[AMS_num][read_num].meters = 0;
@@ -1114,7 +1114,7 @@ void send_for_Set_filament(unsigned char *buf, int length)
     uint8_t command_2 = buf[6];
     static uint8_t t = 0;
     if (BambuBus_address == 0x0700)
-        t = 6;
+        t = 4;
     if (command_1 == 0xE0)
         bmcu_reset = true;
 
@@ -1170,7 +1170,7 @@ package_type BambuBus_run()
     package_type stu = BambuBus_package_NONE;
     static uint64_t time_set = 0;
     static uint64_t time_motion = 0;
-    static uint64_t time_motion_r = 0;
+    static uint64_t time_save = 0;
     uint64_t timex = get_time64();
     // static bool save_s = false;
     /*for (auto i : data_save.filament)
@@ -1226,9 +1226,9 @@ package_type BambuBus_run()
     {
         stu = BambuBus_package_ERROR; // offline
     }
-    if (timex > time_motion_r + 15000)
+    if (timex > time_save + 15000)
     {
-        time_motion_r = timex + 1800000;
+        time_save = timex + 1800000;
         Bambubus_need_to_save = true;
     }
     if (timex > time_motion)
