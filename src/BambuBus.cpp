@@ -210,7 +210,7 @@ void BambuBUS_UART_Init()
     GPIO_Init(GPIOA, &GPIO_InitStructure);
     GPIOA->BCR = GPIO_Pin_12;
 
-    USART_InitStructure.USART_BaudRate = 256000;
+    USART_InitStructure.USART_BaudRate = 512000;
     USART_InitStructure.USART_WordLength = USART_WordLength_9b;
     USART_InitStructure.USART_StopBits = USART_StopBits_1;
     USART_InitStructure.USART_Parity = USART_Parity_Even;
@@ -504,7 +504,7 @@ void set_motion_res_datas(unsigned char *set_buf, unsigned char AMS_num, unsigne
         {
             flagx = 0x02;
         }
-        else if ((data_save.filament[AMS_num][i].motion_set == on_use)) // on use
+        else if ((data_save.filament[AMS_num][i].motion_set == on_use) || (data_save.filament[AMS_num][i].motion_set == pre_pull)) // on use
         {
             flagx = 0x04;
         }
@@ -562,6 +562,14 @@ bool set_motion(unsigned char AMS_num, unsigned char read_num, unsigned char sta
                 data_save.filament[AMS_num][read_num].motion_set = on_use;
                 data_save.filament[AMS_num][read_num].pressure = 0x2B00;
             }
+            else if ((statu_flags == 0x07) && (fliment_motion_flag == 0x00)) // 07 00
+            {
+                if (data_save.filament[AMS_num][read_num].motion_set == on_use)
+                {
+                    data_save.filament[AMS_num][read_num].motion_set = pre_pull;
+                }
+                data_save.filament[AMS_num][read_num].pressure = 0x2B00;
+            }            
         }
         else if ((read_num == 0xFF))
         {
@@ -570,7 +578,7 @@ bool set_motion(unsigned char AMS_num, unsigned char read_num, unsigned char sta
                 if (data_save.BambuBus_now_filament_num < 4)
                 {
                     _filament *filament = &(data_save.filament[AMS_num][data_save.BambuBus_now_filament_num]);
-                    if (filament->motion_set == on_use)
+                    if (filament->motion_set == on_use || filament->motion_set == pre_pull)
                         filament->motion_set = need_pull_back;
                     filament->pressure = 0x4700;
                 }
