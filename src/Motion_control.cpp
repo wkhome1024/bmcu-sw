@@ -196,6 +196,7 @@ public:
         static uint64_t time_set_speed = 0;
         static uint64_t time_last = 0;
         float speed_set = 0;
+        static uint64_t countdownStart[4] = {0};                                // 辅助进料倒计时
         if (time_now >= motor_stop_time)
         {
             motion = 0;
@@ -237,7 +238,7 @@ public:
             else
             {
                 // 已经触发过，或微动触发在其他状态
-                if (MC_ONLINE_key_stu[CHx] != 0 && MC_PULL_stu[CHx] == 2)
+                if (MC_ONLINE_key_stu[CHx] != 0 && MC_PULL_stu[CHx] == 2 && !Bmcu_select())
                 { // 如果滑块被人为拉动，做出对应响应
                     // x = dir * PID_pressure.caculate(MC_PULL_stu_raw[CHx] - 1.65, time_E);
                     speed_set = -40;
@@ -355,22 +356,27 @@ void MC_PULL_ONLINE_read()
         if (MC_PULL_stu_raw[i] > 2) // 大于2V,表示压力过高
         {
             MC_PULL_stu[i] = 2;
+            RGB_pull_check(i, 200, 0, 0); // 紫灯
         }
         else if (MC_PULL_stu_raw[i] < 1.3) // 小于1.3V，表示压力过低
         {
             MC_PULL_stu[i] = -2;
+            RGB_pull_check(i, 0, 0, 200);   // 蓝灯
         }
         else if (MC_PULL_stu_raw[i] > PULL_voltage_up) // 大于1.85V,表示压力高
         {
             MC_PULL_stu[i] = 1;
+            RGB_pull_check(i, 200, 200, 70); // 黄灯
         }
         else if (MC_PULL_stu_raw[i] < PULL_voltage_down) // 小于1.45V，表示压力低
         {
             MC_PULL_stu[i] = -1;
+            RGB_pull_check(i, 70, 200, 200); // 青灯
         }
         else // 1.4~1.7之间，在正常误差范围内，无需动作
         {
             MC_PULL_stu[i] = 0;
+            RGB_pull_check(i, 0, 200, 0); // 绿灯
         }
 
         /*在线状态*/
@@ -656,7 +662,7 @@ void MOTOR_set_time_pull(uint64_t time1)
 
 void motor_motion_run()
 {
-    bool select = Bmcu_select();
+    //bool select = Bmcu_select();
     uint8_t num = get_now_filament_num();
     uint64_t time_now = get_time64();
     uint64_t time_pull = 500;
@@ -809,11 +815,14 @@ void motor_motion_run()
             break;
         }
     }
-    if (!select && MOTOR_CONTROL[num].get_motion() < 0)
+    /*
+    if (!select && MOTOR_CONTROL[num].get_motion() < 0)  //非选中bmcu且在退料时停机
     {
         Pullcheck_set(num, 2);
         MOTOR_CONTROL[num].set_motion(0, 100);
-    }
+    }    
+    */
+
     for (int i = 0; i < 4; i++)
     {
         if (i != num)
@@ -882,19 +891,23 @@ void Motion_control_run(int error)
             set_filament_online(i, false);
             if (MC_PULL_stu[i] == -2)
             {
-                RGB_set(i, 0xFF, 0x00, 0x00);
+                RGB_set(i, 0xFF, 0x00, 0x00); // 红灯
                 if (MC_ONLINE_key_stu[i] != 0)
                 {
-                    RGB_set(i, 0xFF, 0x00, 0xFF);
+                    RGB_set(i, 0x00, 0xFF, 0x00); // 绿灯
                 }
             }
-            else if (MC_ONLINE_key_stu[i] != 0)
+            else if (MC_ONLINE_key_stu[i] == 1)
             {
-                RGB_set(i, 0x00, 0x00, 0xFF);
+                RGB_set(i, 200, 200, 70); // 黄灯
+            }
+            else if (MC_ONLINE_key_stu[i] == 2)
+            {
+                RGB_set(i, 70, 200, 200); // 青灯
             }
             else
             {
-                RGB_set(i, 0x00, 0x00, 0x00);
+                RGB_set(i, 0x37, 0x00, 0x00); // 暗红
             }
         }
     }

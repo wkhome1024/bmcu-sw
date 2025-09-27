@@ -32,5 +32,6 @@
     SysTick->CTLR &= ~(1 << 0);\
 }
 extern void RGB_set(unsigned char CHx,unsigned char R, unsigned char G, unsigned char B);
+extern void RGB_pull_check(unsigned char CHx,unsigned char R, unsigned char G, unsigned char B);
 
 //#include "AMCU.h"

@@ -8,10 +8,10 @@ WS2812_class RGBOUT[4];
 void RGB_init()
 {
     SYS_RGB.init(1, PD1);
-    RGBOUT[3].init(1, PB0);
-    RGBOUT[2].init(1, PB1);
-    RGBOUT[1].init(1, PA8);
-    RGBOUT[0].init(1, PA11);
+    RGBOUT[3].init(2, PB0);
+    RGBOUT[2].init(2, PB1);
+    RGBOUT[1].init(2, PA8);
+    RGBOUT[0].init(2, PA11);
 }
 void RGB_update()
 {
@@ -22,6 +22,10 @@ void RGB_update()
     RGBOUT[3].updata();
 }
 void RGB_set(unsigned char CHx, unsigned char R, unsigned char G, unsigned char B)
+{
+    RGBOUT[CHx].set_RGB(R, G, B, 1);
+}
+void RGB_pull_check(unsigned char CHx, unsigned char R, unsigned char G, unsigned char B)
 {
     RGBOUT[CHx].set_RGB(R, G, B, 0);
 }

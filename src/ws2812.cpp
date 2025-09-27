@@ -61,6 +61,9 @@ void WS2812_class::set_RGB(unsigned char R, unsigned char G, unsigned char B, un
 {
     uint32_t DATA = 0;
     int i;
+    index = index * 3;
+    if (index >= num * 3)
+        return;
     for (i = 0; i < 8; i++)
     {
         DATA <<= 3;
