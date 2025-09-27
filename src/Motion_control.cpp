@@ -1,5 +1,50 @@
 #include "Motion_control.h"
 
+/******************************     AS5600 角度传感器接口       *******************************/
+AS5600_soft_IIC_many MC_AS5600;
+uint32_t AS5600_SCL[] = {PB15, PB14, PB13, PB12};
+uint32_t AS5600_SDA[] = {PD0, PC15, PC14, PC13};
+// uint32_t AS5600_SCL[] = {PA6, PA4, PA2, PA0};
+// uint32_t AS5600_SDA[] = {PA7, PA5, PA3, PA1};
+#define AS5600_PI 3.1415926535897932384626433832795
+#define speed_filter_k 10
+float speed_as5600[4] = {0, 0, 0, 0};
+
+/******************************     初始化 ADC       *******************************/
+void MC_PULL_ONLINE_init()
+{
+    ADC_DMA_init();
+}
+
+/******************************     控制相关变量       *******************************/
+float MC_PULL_stu_raw[4] = {0, 0, 0, 0};
+int MC_PULL_stu[4] = {0, 0, 0, 0};
+float MC_ONLINE_key_stu_raw[4] = {0, 0, 0, 0};
+// 0-离线 1-在线单微动触发 2-双微动触发 3-抖动
+int MC_ONLINE_key_stu[4] = {0, 0, 0, 0};
+
+// 电压控制相关常量
+float PULL_voltage_up = 1.85f;   // 状态 压力高 红灯
+float PULL_voltage_down = 1.45f; // 状态 压力低 蓝灯
+// 微动触发控制相关常量
+float MC_PULL_voltage_pull = 1.5f;
+bool Assist_send_filament[4] = {false, false, false, false};
+bool pull_state_old = false; // 上次触发状态——True：未触发，False：进料完成
+bool is_backing_out = false;
+uint64_t Assist_filament_time[4] = {0, 0, 0, 0};
+uint64_t Assist_send_time = 1200; // 仅触发外侧后，送料时长
+// 退料距离 单位 MM
+float_t P1X_OUT_filament_meters = 200.0f;                  // 内置200mm 外置700mm
+float_t last_total_distance[4] = {0.0f, 0.0f, 0.0f, 0.0f}; // 初始化退料开始时的距离
+// bool filament_channel_inserted[4]={false,false,false,false};//通道是否插入
+// 使用双微动
+bool is_two = true;
+
+/**
+ * 通过 ADC 电压值来设定状态
+ * 霍尔传感器 MC_PULL_stu_raw , 在线状态 MC_ONLINE_key_stu_raw
+ */
+
 #define BMCUMotor_version 1
 #define use_flash_addr ((uint32_t)0x0800FA00)
 struct alignas(4) Motor_save_struct
@@ -68,8 +113,6 @@ void MC_PWM_init()
     TIM_Cmd(TIM4, ENABLE);
 }
 
-uint8_t PULL_key_stu[4] = {0, 0, 0, 0};
-uint8_t PULL_key_change[4] = {0, 0, 0, 0};
 #define PWM_lim 980
 
 class MOTOR_PID
@@ -160,46 +203,96 @@ public:
         if ((get_filament_online(CHx) == false))
         {
             set_filament_motion(CHx, idle);
+            Assist_send_filament[CHx] = true; // 某通道离线后才可触发辅助进料一次
+            countdownStart[CHx] = 0;          // 清空倒计时            
         }
-        if ((motion == 0) || (get_filament_online(CHx) == false))
+        if (get_filament_motion(CHx) == idle) // 在空闲状态
         {
-            // Sendcount_clear(CHx);
-            // set_filament_motion(CHx, idle);
-            PID.clear();
-            Motion_control_set_PWM(CHx, 0);
-            return;
+
+            if (Assist_send_filament[CHx] && is_two)
+            { // 允许状态，尝试辅助进料
+                if (MC_ONLINE_key_stu[CHx] == 2)
+                {                   // 触发外侧微动
+                    speed_set = 40; // 驱动送料
+                }
+                if (MC_ONLINE_key_stu[CHx] == 1)
+                { // 同时触发双微动，准备停机
+                    if (countdownStart[CHx] == 0)
+                    { // 启动倒计时
+                        countdownStart[CHx] = get_time64();
+                    }
+                    uint64_t now = get_time64();
+                    if (now - countdownStart[CHx] >= Assist_send_time) // 倒计时
+                    {
+                        speed_set = 0;                     // 停止电机
+                        Assist_send_filament[CHx] = false; // 达成条件，完成一轮辅助进料。
+                    }
+                    else
+                    {
+                        // 驱动送料
+                        speed_set = 40;
+                    }
+                }
+            }
+            else
+            {
+                // 已经触发过，或微动触发在其他状态
+                if (MC_ONLINE_key_stu[CHx] != 0 && MC_PULL_stu[CHx] == 2)
+                { // 如果滑块被人为拉动，做出对应响应
+                    // x = dir * PID_pressure.caculate(MC_PULL_stu_raw[CHx] - 1.65, time_E);
+                    speed_set = -40;
+                }
+                else if (motion == 0)
+                { // 否则，保持停机
+                    speed_set = 0;
+                    PID.clear();
+                    Motion_control_set_PWM(CHx, 0);
+                    return;
+                }
+            }
         }
-        if (motion == 99) // 刹车
+        else
         {
-            speed_set = 0;
-        }
-        if (motion == 1) // send 370 40  130 15
-        {
-            speed_set = 40;
-        }
-        else if (motion == 2) // over pressure
-        {
-            speed_set = 5;
-        }
-        else if (motion == -3) //  pull 进料重试
-        {
-            speed_set = -40;
-        }
-        else if (motion == -4) // slowly pull
-        {
-            speed_set = -15;
-        }        
-        else if (motion == -1 || motion == -2) // pull 370 70 130 18
-        {
-            speed_set = -60;
-        }
-        else if (motion == 100) // onuse send 370 15 130 10
-        {
-            speed_set = 15;
-        }
-        else if (motion == -100) // onuse pull 370 15 130 10
-        {
-            speed_set = -50;
+            if (motion == 99) // 刹车
+            {
+                speed_set = 0;
+            }
+            if (motion == 1) // send 370 40  130 15
+            {
+                speed_set = 40;
+            }
+            else if (motion == 2) // over pressure
+            {
+                speed_set = 5;
+            }
+            else if (motion == -3) //  pull 进料重试
+            {
+                speed_set = -40;
+            }
+            else if (motion == -4) // slowly pull
+            {
+                speed_set = -15;
+            }
+            else if (motion == -1 || motion == -2) // pull 370 70 130 18
+            {
+                speed_set = -60;
+            }
+            else if (motion == 100) // onuse send 370 15 130 10
+            {
+                speed_set = 15;
+            }
+            else if (motion == 200) // onuse send 370 25 130 15
+            {
+                speed_set = 25;
+            }
+            else if (motion == -100) // onuse pull 370 15 130 10
+            {
+                speed_set = -50;
+            }
+            else if (motion == -200) // onuse pull 370 25 130 15
+            {
+                speed_set = -70;
+            }
         }
 
         float x = PID.caculate(now_speed - speed_set, (float)(time_now - time_last) / 1000);
@@ -229,78 +322,94 @@ public:
     }
 };
 _MOTOR_CONTROL MOTOR_CONTROL[4] = {_MOTOR_CONTROL(0), _MOTOR_CONTROL(1), _MOTOR_CONTROL(2), _MOTOR_CONTROL(3)};
-void MC_PULL_key_read(void)
-{
-    PULL_key_stu[3] = digitalRead(PB12);
-    PULL_key_stu[2] = digitalRead(PB13);
-    PULL_key_stu[1] = digitalRead(PB14);
-    PULL_key_stu[0] = digitalRead(PB15);
-}
-void MC_PULL_key_init()
-{
-    GPIO_InitTypeDef GPIO_InitStructure;
-    RCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOB, ENABLE);
-    GPIO_InitStructure.GPIO_Mode = GPIO_Mode_IPU;
-    GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
-    GPIO_InitStructure.GPIO_Pin = GPIO_Pin_12 | GPIO_Pin_13 | GPIO_Pin_14 | GPIO_Pin_15;
-    GPIO_Init(GPIOB, &GPIO_InitStructure);
-    MC_PULL_key_read();
-}
 
-uint8_t ONLINE_key_stu[4] = {0, 0, 0, 0};
-uint64_t ONLINE_key_stu_count[4] = {0, 0, 0, 0};
-uint8_t ONLINE_key_change[4] = {0, 0, 0, 0};
-// uint64_t ONLINE_key_change_count[4] = {0, 0, 0, 0};
-void MC_ONLINE_key_read(void)
+// uint8_t ONLINE_key_stu[4] = {0, 0, 0, 0};
+// uint64_t ONLINE_key_stu_count[4] = {0, 0, 0, 0};
+// uint8_t ONLINE_key_change[4] = {0, 0, 0, 0};
+//  uint64_t ONLINE_key_change_count[4] = {0, 0, 0, 0};
+void MC_PULL_ONLINE_read()
 {
-    uint8_t stu_read[4];
-    uint64_t time_now = get_time64();
-    uint64_t time_set = time_now + 5000;
-    // uint64_t time_set1 = time_now + 50;
-    stu_read[0] = digitalRead(PD0);
-    stu_read[1] = digitalRead(PC15);
-    stu_read[2] = digitalRead(PC14);
-    stu_read[3] = digitalRead(PC13);
+    float *data = ADC_DMA_get_value();
+    MC_PULL_stu_raw[3] = data[0];
+    MC_ONLINE_key_stu_raw[3] = data[1];
+    MC_PULL_stu_raw[2] = data[2];
+    MC_ONLINE_key_stu_raw[2] = data[3];
+    MC_PULL_stu_raw[1] = data[4];
+    MC_ONLINE_key_stu_raw[1] = data[5];
+    MC_PULL_stu_raw[0] = data[6];
+    MC_ONLINE_key_stu_raw[0] = data[7];
 
     for (int i = 0; i < 4; i++)
     {
-        if (ONLINE_key_stu[i] == stu_read[i])
-        {
-            ONLINE_key_stu_count[i] = time_set;
-            // ONLINE_key_change_count[i] = time_set1;
+        /*
+        if (i == 0){
+            DEBUG_MY("MC_PULL_stu_raw = ");
+            DEBUG_float(MC_PULL_stu_raw[i],3);
+            DEBUG_MY("  MC_ONLINE_key_stu_raw = ");
+            DEBUG_float(MC_ONLINE_key_stu_raw[i],3);
+            DEBUG_MY("  通道：");
+            DEBUG_float(i,1);
+            DEBUG_MY("   \n");
         }
-        else if (ONLINE_key_stu_count[i] < time_now)
+        */
+        if (MC_PULL_stu_raw[i] > 2) // 大于2V,表示压力过高
         {
-            ONLINE_key_stu[i] = stu_read[i];
+            MC_PULL_stu[i] = 2;
         }
-        // else if (ONLINE_key_change_count[i] < time_now)   //防止微动抖动
-        // {
-        //     ONLINE_key_change[i] = stu_read[i];
-        //     ONLINE_key_change_count[i] = time_set1;
-        // }
+        else if (MC_PULL_stu_raw[i] < 1.3) // 小于1.3V，表示压力过低
+        {
+            MC_PULL_stu[i] = -2;
+        }
+        else if (MC_PULL_stu_raw[i] > PULL_voltage_up) // 大于1.85V,表示压力高
+        {
+            MC_PULL_stu[i] = 1;
+        }
+        else if (MC_PULL_stu_raw[i] < PULL_voltage_down) // 小于1.45V，表示压力低
+        {
+            MC_PULL_stu[i] = -1;
+        }
+        else // 1.4~1.7之间，在正常误差范围内，无需动作
+        {
+            MC_PULL_stu[i] = 0;
+        }
 
-        if (stu_read[i] == 0)
-        {
-            ONLINE_key_stu[i] = stu_read[i];
-            // ONLINE_key_change[i] = stu_read[i];
-        }
+        /*在线状态*/
 
-        ONLINE_key_change[i] = stu_read[i];
+        // 耗材在线判断 , is_two 考虑弃用
+        if (is_two == false)
+        {
+            // 大于1.65V，为耗材在线，高电平.
+            if (MC_ONLINE_key_stu_raw[i] > 1.55)
+            {
+                MC_ONLINE_key_stu[i] = 1;
+            }
+            else
+            {
+                MC_ONLINE_key_stu[i] = 0;
+            }
+        }
+        else
+        {
+            // DEBUG_MY(MC_ONLINE_key_stu_raw);
+            // 双微动
+            if (MC_ONLINE_key_stu_raw[i] < 0.6f)
+            { // 小于则离线.
+                MC_ONLINE_key_stu[i] = 0;
+            }
+            else if ((MC_ONLINE_key_stu_raw[i] < 1.8f) & (MC_ONLINE_key_stu_raw[i] > 1.4f))
+            { // 仅触发1个微动，需辅助进料
+                MC_ONLINE_key_stu[i] = 1;
+            }
+            else if (MC_ONLINE_key_stu_raw[i] > 1.8f)
+            { // 双微动同时触发, 在线状态
+                MC_ONLINE_key_stu[i] = 2;
+            }
+            else if (MC_ONLINE_key_stu_raw[i] < 1.4f)
+            { // 仅触发内侧微动 , 需确认是缺料还是抖动.
+                MC_ONLINE_key_stu[i] = 3;
+            }
+        }
     }
-}
-void MC_ONLINE_key_init()
-{
-    GPIO_InitTypeDef GPIO_InitStructure;
-    RCC_APB2PeriphClockCmd(RCC_APB2Periph_AFIO, ENABLE);
-    GPIO_PinRemapConfig(GPIO_Remap_PD01, ENABLE);
-    RCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOC | RCC_APB2Periph_GPIOD, ENABLE);
-    GPIO_InitStructure.GPIO_Mode = GPIO_Mode_IPU;
-    GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
-    GPIO_InitStructure.GPIO_Pin = GPIO_Pin_13 | GPIO_Pin_14 | GPIO_Pin_15;
-    GPIO_Init(GPIOC, &GPIO_InitStructure);
-    GPIO_InitStructure.GPIO_Pin = GPIO_Pin_0;
-    GPIO_Init(GPIOD, &GPIO_InitStructure);
-    MC_ONLINE_key_read();
 }
 
 void Motion_control_set_PWM(uint8_t CHx, int PWM)
@@ -334,11 +443,6 @@ void Motion_control_set_PWM(uint8_t CHx, int PWM)
         break;
     }
 }
-AS5600_soft_IIC_many MC_AS5600;
-// uint32_t AS5600_SCL[] = {PA0, PA2, PA4, PA6};
-// uint32_t AS5600_SDA[] = {PA1, PA3, PA5, PA7};
-uint32_t AS5600_SCL[] = {PA6, PA4, PA2, PA0};
-uint32_t AS5600_SDA[] = {PA7, PA5, PA3, PA1};
 
 void MOTOR_get_pwm_zero()
 {
@@ -449,14 +553,13 @@ void Motor_init()
 void Motion_control_init()
 {
     MC_PWM_init();
-    MC_PULL_key_init();
-    MC_ONLINE_key_init();
+    // MC_PULL_key_init();
+    // MC_ONLINE_key_init();
+    MC_PULL_ONLINE_init();
     MC_AS5600.init(AS5600_SCL, AS5600_SDA, 4);
     Motor_init();
 }
-#define AS5600_PI 3.1415926535897932384626433832795
-#define speed_filter_k 10
-float speed_as5600[4] = {0, 0, 0, 0};
+
 void AS5600_distance_updata()
 {
     static int32_t distance_save[4] = {0, 0, 0, 0};
@@ -539,7 +642,7 @@ bool Bmcucheck()
 {
     for (int i = 0; i < 4; i++)
     {
-        if (PULL_key_stu[i] == 0 || ONLINE_key_change[i] == 0)
+        if (MC_PULL_stu[i] < 0 || MC_ONLINE_key_stu[i] != 1)
             return true;
     }
     return false;
@@ -613,7 +716,7 @@ void motor_motion_run()
                 // if (sendcheck_count[num] == 0)
 
                 // if (sendcheck_count[num] > time_now && ONLINE_key_change[num] == 0)
-                if (ONLINE_key_change[num] == 0)
+                if (MC_PULL_stu[num] < 1)
                 {
                     MOTOR_CONTROL[num].set_motion(1, 100);
                     sendcheck_count[num] = 0;
@@ -625,10 +728,10 @@ void motor_motion_run()
             }
             if (send_count[num] > time_now && send_count[num] < time_now + 1000)
             {
-                if (ONLINE_key_change[num] == 1)
+                if (MC_PULL_stu[num] >= 1)
                     MOTOR_CONTROL[num].set_motion(-3, 1500);
             }
-            else if (ONLINE_key_change[num] == 1 && sendcheck_count[num] == 0) // 进料重试
+            else if (MC_PULL_stu[num] >= 1 && sendcheck_count[num] == 0) // 进料重试
             {
                 send_count[num] = time_now + 2500;
                 sendcheck_count[num] = 1;
@@ -672,20 +775,24 @@ void motor_motion_run()
             {
                 MOTOR_CONTROL[num].set_motion(2, 1000); // 保持压力延迟1000ms
             }
-            else if (MOTOR_CONTROL[num].get_motion() != 2 || PULL_key_stu[num] == 0)
+            else if (MOTOR_CONTROL[num].get_motion() != 2 || MC_PULL_stu[num] < 0)
             {
-                if (PULL_key_stu[num] == 0)
+                if (MC_PULL_stu[num] == -1)
                     MOTOR_CONTROL[num].set_motion(100, 100);
-                else if (ONLINE_key_change[num] == 1)
+                else if (MC_PULL_stu[num] == -2)
+                    MOTOR_CONTROL[num].set_motion(200, 100);
+                else if (MC_PULL_stu[num] == 1)
+                    MOTOR_CONTROL[num].set_motion(-100, 100);
+                else if (MC_PULL_stu[num] == 2)
                     MOTOR_CONTROL[num].set_motion(-100, 100);
             }
 
             RGB_set(num, 0xFF, 0xFF, 0xFF);
             break;
         case pre_pull:
-            if (PULL_key_stu[num] == 0)
+            if (MC_PULL_stu[num] < 0)
                 MOTOR_CONTROL[num].set_motion(0, 100);
-            else if (ONLINE_key_change[num] == 1)
+            else if (MC_PULL_stu[num] > 0)
                 MOTOR_CONTROL[num].set_motion(-100, 100);
             else
                 MOTOR_CONTROL[num].set_motion(-4, 100);
@@ -723,8 +830,9 @@ bool Bmcu_set()
 }
 void Motion_control_run(int error)
 {
-    MC_PULL_key_read();
-    MC_ONLINE_key_read();
+    // MC_PULL_key_read();
+    // MC_ONLINE_key_read();
+    MC_PULL_ONLINE_read();
 
     AS5600_distance_updata();
     uint64_t time_now = get_time64();
@@ -732,7 +840,7 @@ void Motion_control_run(int error)
     for (int i = 0; i < 4; i++)
     {
 
-        if ((ONLINE_key_stu[i] == 0) && (MC_AS5600.online[i] == true))
+        if ((MC_ONLINE_key_stu[i] != 0) && (MC_AS5600.online[i] == true))
         {
             set_filament_online(i, true);
         }
@@ -756,7 +864,7 @@ void Motion_control_run(int error)
         uint8_t num = 0;
         for (int i = 1; i < 5; i++)
         {
-            if (PULL_key_stu[i - 1] == 1 && ONLINE_key_change[i - 1] == 1)
+            if (MC_PULL_stu[i - 1] == 2 && MC_ONLINE_key_stu[i - 1] == 0) // 拔出缓冲且拔出耗材
                 num += i;
         }
 
@@ -772,15 +880,15 @@ void Motion_control_run(int error)
         for (int i = 0; i < 4; i++)
         {
             set_filament_online(i, false);
-            if (PULL_key_stu[i] == 0)
+            if (MC_PULL_stu[i] == -2)
             {
                 RGB_set(i, 0xFF, 0x00, 0x00);
-                if (ONLINE_key_stu[i] == 0)
+                if (MC_ONLINE_key_stu[i] != 0)
                 {
                     RGB_set(i, 0xFF, 0x00, 0xFF);
                 }
             }
-            else if (ONLINE_key_stu[i] == 0)
+            else if (MC_ONLINE_key_stu[i] != 0)
             {
                 RGB_set(i, 0x00, 0x00, 0xFF);
             }

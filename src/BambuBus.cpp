@@ -7,7 +7,7 @@ CRC8 crc_8;
 uint8_t BambuBus_data_buf[500];
 int BambuBus_have_data = 0;
 uint16_t BambuBus_address = 0;
-uint8_t AMS_num = 1;
+//uint8_t AMS_num = 1;
 bool bmcu_reset = false;
 bool Bmcu_filament_flag = false;
 bool Bmcu_select_flag = false;
@@ -36,7 +36,7 @@ struct alignas(4) flash_save_struct
 {
     _filament filament[4][4];
     int BambuBus_now_filament_num = 0;
-    uint8_t bmcu = 0;
+    uint8_t bmcu = 1;
     uint32_t version = Bambubus_version;
     uint32_t check = 0x40614061;
 } data_save;
