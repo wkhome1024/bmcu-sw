@@ -36,7 +36,7 @@ struct alignas(4) flash_save_struct
 {
     _filament filament[4][4];
     int BambuBus_now_filament_num = 0;
-    uint8_t bmcu = 1;
+    uint8_t bmcu = 0;
     uint32_t version = Bambubus_version;
     uint32_t check = 0x40614061;
 } data_save;

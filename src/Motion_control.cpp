@@ -24,28 +24,28 @@ float MC_ONLINE_key_stu_raw[4] = {0, 0, 0, 0};
 int MC_ONLINE_key_stu[4] = {0, 0, 0, 0};
 
 // 电压控制相关常量
-float PULL_voltage_up = 1.85f;   // 状态 压力高 红灯
+float PULL_voltage_up = 1.80f;   // 状态 压力高 红灯
 float PULL_voltage_down = 1.45f; // 状态 压力低 蓝灯
 // 微动触发控制相关常量
-float MC_PULL_voltage_pull = 1.5f;
+float MC_PULL_voltage_pull = 1.60f;
 bool Assist_send_filament[4] = {false, false, false, false};
-bool pull_state_old = false; // 上次触发状态——True：未触发，False：进料完成
-bool is_backing_out = false;
+// bool pull_state_old = false; // 上次触发状态——True：未触发，False：进料完成
+// bool is_backing_out = false;
 uint64_t Assist_filament_time[4] = {0, 0, 0, 0};
-uint64_t Assist_send_time = 1200; // 仅触发外侧后，送料时长
+uint64_t Assist_send_time = 3000; // 仅触发外侧后，送料时长
 // 退料距离 单位 MM
-float_t P1X_OUT_filament_meters = 200.0f;                  // 内置200mm 外置700mm
-float_t last_total_distance[4] = {0.0f, 0.0f, 0.0f, 0.0f}; // 初始化退料开始时的距离
+// float_t P1X_OUT_filament_meters = 200.0f;                  // 内置200mm 外置700mm
+// float_t last_total_distance[4] = {0.0f, 0.0f, 0.0f, 0.0f}; // 初始化退料开始时的距离
 // bool filament_channel_inserted[4]={false,false,false,false};//通道是否插入
 // 使用双微动
-bool is_two = true;
+// bool is_two = true;
 
 /**
  * 通过 ADC 电压值来设定状态
  * 霍尔传感器 MC_PULL_stu_raw , 在线状态 MC_ONLINE_key_stu_raw
  */
 
-#define BMCUMotor_version 1
+#define BMCUMotor_version 2
 #define use_flash_addr ((uint32_t)0x0800FA00)
 struct alignas(4) Motor_save_struct
 {
@@ -196,7 +196,7 @@ public:
         static uint64_t time_set_speed = 0;
         static uint64_t time_last = 0;
         float speed_set = 0;
-        static uint64_t countdownStart[4] = {0};                                // 辅助进料倒计时
+        static uint64_t countdownStart[4] = {0}; // 辅助进料倒计时
         if (time_now >= motor_stop_time)
         {
             motion = 0;
@@ -204,41 +204,48 @@ public:
         if ((get_filament_online(CHx) == false))
         {
             set_filament_motion(CHx, idle);
-            Assist_send_filament[CHx] = true; // 某通道离线后才可触发辅助进料一次
-            countdownStart[CHx] = 0;          // 清空倒计时            
+            if (time_now > 3000)
+                Assist_send_filament[CHx] = true; // 某通道离线后才可触发辅助进料一次
+            countdownStart[CHx] = 0;              // 清空倒计时
+            PID.clear();
+            Motion_control_set_PWM(CHx, 0);
+            time_last = time_now;
+            return;
         }
-        if (get_filament_motion(CHx) == idle) // 在空闲状态
+        if (get_filament_motion(CHx) == idle && motion == 0) // 在空闲状态
         {
 
-            if (Assist_send_filament[CHx] && is_two)
+            if (Assist_send_filament[CHx])
             { // 允许状态，尝试辅助进料
-                if (MC_ONLINE_key_stu[CHx] == 2)
-                {                   // 触发外侧微动
-                    speed_set = 40; // 驱动送料
-                }
                 if (MC_ONLINE_key_stu[CHx] == 1)
+                {                   // 触发外侧微动
+                    speed_set = 25; // 驱动送料
+                }
+                if (MC_ONLINE_key_stu[CHx] == 2)
                 { // 同时触发双微动，准备停机
                     if (countdownStart[CHx] == 0)
                     { // 启动倒计时
-                        countdownStart[CHx] = get_time64();
+                        countdownStart[CHx] = time_now;
                     }
-                    uint64_t now = get_time64();
-                    if (now - countdownStart[CHx] >= Assist_send_time) // 倒计时
+                    if (time_now - countdownStart[CHx] >= Assist_send_time) // 倒计时
                     {
                         speed_set = 0;                     // 停止电机
                         Assist_send_filament[CHx] = false; // 达成条件，完成一轮辅助进料。
+                        PID.clear();
+                        Motion_control_set_PWM(CHx, 0);
+                        time_last = time_now;
+                        return;
                     }
                     else
                     {
-                        // 驱动送料
-                        speed_set = 40;
+                        speed_set = 25; // 驱动送料
                     }
                 }
             }
             else
             {
                 // 已经触发过，或微动触发在其他状态
-                if (MC_ONLINE_key_stu[CHx] != 0 && MC_PULL_stu[CHx] == 2 && !Bmcu_select())
+                if (MC_ONLINE_key_stu[CHx] >= 1 && MC_PULL_stu[CHx] == 2 && !Bmcu_select())
                 { // 如果滑块被人为拉动，做出对应响应
                     // x = dir * PID_pressure.caculate(MC_PULL_stu_raw[CHx] - 1.65, time_E);
                     speed_set = -40;
@@ -248,6 +255,7 @@ public:
                     speed_set = 0;
                     PID.clear();
                     Motion_control_set_PWM(CHx, 0);
+                    time_last = time_now;
                     return;
                 }
             }
@@ -293,6 +301,12 @@ public:
             else if (motion == -200) // onuse pull 370 25 130 15
             {
                 speed_set = -70;
+            }
+            else if (motion == 66) // onuse pressure
+            {
+                speed_set = (MC_PULL_voltage_pull - MC_PULL_stu_raw[CHx]) * 50; // 线性压力反馈
+                if (speed_set < 0 && speed_set > -5)                            // 防止电机抖动
+                    speed_set = 0;
             }
         }
 
@@ -353,17 +367,17 @@ void MC_PULL_ONLINE_read()
             DEBUG_MY("   \n");
         }
         */
-        if (MC_PULL_stu_raw[i] > 2) // 大于2V,表示压力过高
+        if (MC_PULL_stu_raw[i] > 2.0f) // 大于2V,表示压力过高
         {
             MC_PULL_stu[i] = 2;
-            RGB_pull_check(i, 200, 0, 0); // 紫灯
+            RGB_pull_check(i, 200, 0, 0); // 红灯
         }
-        else if (MC_PULL_stu_raw[i] < 1.3) // 小于1.3V，表示压力过低
+        else if (MC_PULL_stu_raw[i] < 1.3f) // 小于1.3V，表示压力过低
         {
             MC_PULL_stu[i] = -2;
-            RGB_pull_check(i, 0, 0, 200);   // 蓝灯
+            RGB_pull_check(i, 0, 0, 200); // 蓝灯
         }
-        else if (MC_PULL_stu_raw[i] > PULL_voltage_up) // 大于1.85V,表示压力高
+        else if (MC_PULL_stu_raw[i] > PULL_voltage_up) // 大于1.80V,表示压力高
         {
             MC_PULL_stu[i] = 1;
             RGB_pull_check(i, 200, 200, 70); // 黄灯
@@ -373,7 +387,7 @@ void MC_PULL_ONLINE_read()
             MC_PULL_stu[i] = -1;
             RGB_pull_check(i, 70, 200, 200); // 青灯
         }
-        else // 1.4~1.7之间，在正常误差范围内，无需动作
+        else // 1.45~1.80之间，在正常缓冲范围内按线性位置反馈
         {
             MC_PULL_stu[i] = 0;
             RGB_pull_check(i, 0, 200, 0); // 绿灯
@@ -381,39 +395,22 @@ void MC_PULL_ONLINE_read()
 
         /*在线状态*/
 
-        // 耗材在线判断 , is_two 考虑弃用
-        if (is_two == false)
-        {
-            // 大于1.65V，为耗材在线，高电平.
-            if (MC_ONLINE_key_stu_raw[i] > 1.55)
-            {
-                MC_ONLINE_key_stu[i] = 1;
-            }
-            else
-            {
-                MC_ONLINE_key_stu[i] = 0;
-            }
+        // 双微动
+        if (MC_ONLINE_key_stu_raw[i] < 0.6f)
+        { // 小于则离线.
+            MC_ONLINE_key_stu[i] = 0;
         }
-        else
-        {
-            // DEBUG_MY(MC_ONLINE_key_stu_raw);
-            // 双微动
-            if (MC_ONLINE_key_stu_raw[i] < 0.6f)
-            { // 小于则离线.
-                MC_ONLINE_key_stu[i] = 0;
-            }
-            else if ((MC_ONLINE_key_stu_raw[i] < 1.8f) & (MC_ONLINE_key_stu_raw[i] > 1.4f))
-            { // 仅触发1个微动，需辅助进料
-                MC_ONLINE_key_stu[i] = 1;
-            }
-            else if (MC_ONLINE_key_stu_raw[i] > 1.8f)
-            { // 双微动同时触发, 在线状态
-                MC_ONLINE_key_stu[i] = 2;
-            }
-            else if (MC_ONLINE_key_stu_raw[i] < 1.4f)
-            { // 仅触发内侧微动 , 需确认是缺料还是抖动.
-                MC_ONLINE_key_stu[i] = 3;
-            }
+        else if ((MC_ONLINE_key_stu_raw[i] < 1.8f) & (MC_ONLINE_key_stu_raw[i] > 1.4f))
+        { // 仅触发1个微动，需辅助进料
+            MC_ONLINE_key_stu[i] = 1;
+        }
+        else if (MC_ONLINE_key_stu_raw[i] > 1.8f)
+        { // 双微动同时触发, 在线状态
+            MC_ONLINE_key_stu[i] = 2;
+        }
+        else if (MC_ONLINE_key_stu_raw[i] < 1.4f)
+        { // 仅触发内侧微动 , 需确认是缺料还是抖动.
+            MC_ONLINE_key_stu[i] = 3;
         }
     }
 }
@@ -610,7 +607,7 @@ uint64_t sendcheck_count[4] = {0, 0, 0, 0}; // 长回抽
 uint64_t senddelay_count[4] = {0, 0, 0, 0}; // 长回抽
 uint64_t pulldelay_count[4] = {10, 10, 10, 10};
 uint64_t pullcheck_count[4] = {0, 0, 0, 0};
-uint64_t pullcheck[4] = {0, 0, 0, 0}; // 当前bmcu通道使用标记
+uint8_t pullcheck[4] = {0, 0, 0, 0}; // 当前bmcu通道使用标记
 void Sendcount_clear(uint8_t CHx)
 {
     sendcheck_count[CHx] = 0;
@@ -662,7 +659,7 @@ void MOTOR_set_time_pull(uint64_t time1)
 
 void motor_motion_run()
 {
-    //bool select = Bmcu_select();
+    // bool select = Bmcu_select();
     uint8_t num = get_now_filament_num();
     uint64_t time_now = get_time64();
     uint64_t time_pull = 500;
@@ -791,6 +788,8 @@ void motor_motion_run()
                     MOTOR_CONTROL[num].set_motion(-100, 100);
                 else if (MC_PULL_stu[num] == 2)
                     MOTOR_CONTROL[num].set_motion(-100, 100);
+                else if (MC_PULL_stu[num] == 0)
+                    MOTOR_CONTROL[num].set_motion(66, 100);
             }
 
             RGB_set(num, 0xFF, 0xFF, 0xFF);
@@ -820,7 +819,7 @@ void motor_motion_run()
     {
         Pullcheck_set(num, 2);
         MOTOR_CONTROL[num].set_motion(0, 100);
-    }    
+    }
     */
 
     for (int i = 0; i < 4; i++)
