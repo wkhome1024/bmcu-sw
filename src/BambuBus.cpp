@@ -115,6 +115,18 @@ _filament_motion_state_set get_filament_motion(int num)
     return data_save.filament[data_save.bmcu][num].motion_set;
 }
 
+bool filament_check()
+{
+    for (int i = 0; i < 4; i++)
+    {
+        if (data_save.filament[data_save.bmcu][i].motion_set != idle)
+        {
+            return true;
+        }
+    }
+    return false;
+}
+
 uint8_t buf_X[500];
 CRC8 _RX_IRQ_crcx(0x39, 0x66, 0x00, false, false);
 void inline RX_IRQ(unsigned char _RX_IRQ_data)
@@ -515,17 +527,6 @@ void set_motion_res_datas(unsigned char *set_buf, unsigned char AMS_num, unsigne
     set_buf[10] = get_filament_left_char(AMS_num);
 }
 
-bool filament_check(unsigned char AMS_num)
-{
-    for (int i = 0; i < 4; i++)
-    {
-        if (data_save.filament[AMS_num][i].motion_set == on_use)
-        {
-            return true;
-        }
-    }
-    return false;
-}
 
 bool set_motion(unsigned char AMS_num, unsigned char read_num, unsigned char statu_flags, unsigned char fliment_motion_flag)
 {
@@ -1139,11 +1140,11 @@ void send_for_Set_filament(unsigned char *buf, int length)
         else if (command_2 == 0xD3 && read_num == 0) // 棕色  --电机退料时间设定
             MOTOR_set_time_pull(10000 + (t * 1000));
         else if (command_2 == 0xD3 && read_num == 1) // 棕色  --电机退料时间设定
-            MOTOR_set_time_pull(11000 + (t * 1000));
-        else if (command_2 == 0xD3 && read_num == 2) // 棕色  --电机退料时间设定 --默认
             MOTOR_set_time_pull(12000 + (t * 1000));
+        else if (command_2 == 0xD3 && read_num == 2) // 棕色  --电机退料时间设定 --默认
+            MOTOR_set_time_pull(14000 + (t * 1000));
         else if (command_2 == 0xD3 && read_num == 3) // 棕色  --电机退料时间设定
-            MOTOR_set_time_pull(13000 + (t * 1000));
+            MOTOR_set_time_pull(16000 + (t * 1000));
         else if (command_2 == 0xD5 && read_num == 0) ////岩石灰  --电机pwm 设定
             MOTOR_set_pwm_zero(220);
         else if (command_2 == 0xD5 && read_num == 1) ////岩石灰  --电机pwm 设定
@@ -1179,6 +1180,7 @@ package_type BambuBus_run()
     static uint64_t time_set = 0;
     static uint64_t time_motion = 0;
     static uint64_t time_save = 0;
+    static uint64_t time_check = 0;
     uint64_t timex = get_time64();
     // static bool save_s = false;
     /*for (auto i : data_save.filament)
@@ -1254,6 +1256,18 @@ package_type BambuBus_run()
         Bambubus_need_to_save = false;
     }
     // HAL_UART_Transmit(&use_Serial.handle,&s,1,1000);
+    if (time_check < timex - 300000 && time_check != 0)
+    {
+        time_check = 0;
+        if (Bmcu_select_flag && !filament_check())
+        {
+            Bmcu_select_flag = false;
+        }
+    }
+    else if (Bmcu_select_flag)
+    {
+        time_check = timex;
+    }
 
     // NFC_detect_run();
     return stu;
