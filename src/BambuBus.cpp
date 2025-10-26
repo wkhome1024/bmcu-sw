@@ -36,7 +36,7 @@ struct alignas(4) flash_save_struct
 {
     _filament filament[4][4];
     int BambuBus_now_filament_num = 0;
-    uint8_t bmcu = 0;
+    uint8_t bmcu = 3;
     uint32_t version = Bambubus_version;
     uint32_t check = 0x40614061;
 } data_save;
@@ -1256,15 +1256,18 @@ package_type BambuBus_run()
         Bambubus_need_to_save = false;
     }
     // HAL_UART_Transmit(&use_Serial.handle,&s,1,1000);
-    if (time_check < timex - 300000 && time_check != 0)
+    if (time_check < timex - 180000 && time_check != 0)
     {
-        time_check = 0;
-        if (Bmcu_select_flag && !filament_check())
+        if (!Bmcu_select_flag)
+        {
+            time_check = 0; 
+        }
+        else if (Bmcu_select_flag && !filament_check())
         {
             Bmcu_select_flag = false;
         }
     }
-    else if (Bmcu_select_flag)
+    else if (Bmcu_select_flag && filament_check())
     {
         time_check = timex;
     }

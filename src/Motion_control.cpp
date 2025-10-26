@@ -45,7 +45,7 @@ uint64_t Assist_send_time = 3000; // 仅触发外侧后，送料时长
  * 霍尔传感器 MC_PULL_stu_raw , 在线状态 MC_ONLINE_key_stu_raw
  */
 
-#define BMCUMotor_version 2
+#define BMCUMotor_version 1
 #define use_flash_addr ((uint32_t)0x0800FA00)
 struct alignas(4) Motor_save_struct
 {
@@ -749,7 +749,7 @@ void motor_motion_run()
             }
             else if (MOTOR_CONTROL[num].get_motion() == 99 || MOTOR_CONTROL[num].get_motion() == 3)
             {
-                MOTOR_CONTROL[num].set_motion(2, 2000); // 保持压力延迟2000ms
+                MOTOR_CONTROL[num].set_motion(2, 10000); // 保持压力延迟10s
             }
             else if (MOTOR_CONTROL[num].get_motion() != 2 || MC_PULL_stu[num] < 0)
             {
@@ -764,7 +764,10 @@ void motor_motion_run()
                 else if (MC_PULL_stu[num] == 0)
                     MOTOR_CONTROL[num].set_motion(66, 100);
             }
-
+            if (MOTOR_CONTROL[num].get_motion() == 2 && MC_PULL_stu[num] == 2)
+            {
+                MOTOR_CONTROL[num].set_motion(99, 100);             //保持压力 确保送入挤出轮
+            }
             RGB_set(num, 0xFF, 0xFF, 0xFF);
             break;
         case pre_pull:
