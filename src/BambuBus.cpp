@@ -1109,7 +1109,10 @@ void send_for_long_packge_version(unsigned char *buf, int length)
     // Bambubus_long_package_send(&data);
 }
 unsigned char s = 0x01;
-
+//unsigned char filament_res[] = {0x7D, 0x0A, 0x08,
+//                                0x00, 0x00, // amsnum + taynum
+//                                0x00, 0x00, // 公用控制位 + 专用控制位
+//                                0x00};      // crc8 校验
 unsigned char Set_filament_res[] = {0x3D, 0xC0, 0x08, 0xB2, 0x08, 0x60, 0xB4, 0x04};
 const unsigned char select_bmcu_filament_name[] = "TPU-AMS";                // ID: GFU02
 const unsigned char reset_bmcu_meter_color[4] = {0xFF, 0xFF, 0xFF, 0xFF};   // white
@@ -1123,7 +1126,7 @@ void send_for_Set_filament(unsigned char *buf, int length)
     uint8_t command_2 = buf[6];
     static uint8_t t = 0;
     if (BambuBus_address == 0x0700)
-        t = 4;
+        t = 14;
     if (command_1 == 0xE0)
         bmcu_reset = true;
 
@@ -1137,24 +1140,32 @@ void send_for_Set_filament(unsigned char *buf, int length)
             reset_filament_meters(read_num);
         else if (command_2 == 0xD9) // 黑色  --指定通道onuse
             set_filament_motion(read_num, on_use);
-        else if (command_2 == 0xD3 && read_num == 0) // 棕色  --电机退料时间设定
-            MOTOR_set_time_pull(10000 + (t * 1000));
+        else if (command_2 == 0xD3 && read_num == 0) // 棕色  --电机退料时间设定  --默认
+            MOTOR_set_time_pull(true ,1000 + (t * 1000));
         else if (command_2 == 0xD3 && read_num == 1) // 棕色  --电机退料时间设定
-            MOTOR_set_time_pull(12000 + (t * 1000));
-        else if (command_2 == 0xD3 && read_num == 2) // 棕色  --电机退料时间设定 --默认
-            MOTOR_set_time_pull(14000 + (t * 1000));
+            MOTOR_set_time_pull(true, 4000 + (t * 1000));
+        else if (command_2 == 0xD3 && read_num == 2) // 棕色  --电机退料时间设定 
+            MOTOR_set_time_pull(true, 7000 + (t * 1000));
         else if (command_2 == 0xD3 && read_num == 3) // 棕色  --电机退料时间设定
-            MOTOR_set_time_pull(16000 + (t * 1000));
-        else if (command_2 == 0xD5 && read_num == 0) ////岩石灰  --电机pwm 设定
+            MOTOR_set_time_pull(true, 10000 + (t * 1000));
+        else if (command_2 == 0xD5 && read_num == 0) // 岩石灰  --电机退料时间设定
+            MOTOR_set_time_pull(false, 500);
+        else if (command_2 == 0xD5 && read_num == 1) // 岩石灰  --电机退料时间设定 --默认
+            MOTOR_set_time_pull(false, 8000);
+        else if (command_2 == 0xD5 && read_num == 2) // 岩石灰  --电机退料时间设定
+            MOTOR_set_time_pull(false, 15000);
+        else if (command_2 == 0xD5 && read_num == 3) // 岩石灰  --电机退料时间设定
+            MOTOR_set_time_pull(false, 21000);
+        else if (command_2 == 0xD7 && read_num == 0) ////灰色  --电机pwm 设定
             MOTOR_set_pwm_zero(220);
-        else if (command_2 == 0xD5 && read_num == 1) ////岩石灰  --电机pwm 设定
+        else if (command_2 == 0xD7 && read_num == 1) ////灰色  --电机pwm 设定
             MOTOR_set_pwm_zero(300);
-        else if (command_2 == 0xD5 && read_num == 2) ////岩石灰  --电机pwm 设定  --默认
+        else if (command_2 == 0xD7 && read_num == 2) ////灰色  --电机pwm 设定  --默认
             MOTOR_set_pwm_zero(380);
-        else if (command_2 == 0xD5 && read_num == 3) ////岩石灰  --电机pwm 设定
+        else if (command_2 == 0xD7 && read_num == 3) ////灰色  --电机pwm 设定
             MOTOR_set_pwm_zero(460);
-        else if (command_2 == 0xD7)               ////灰色  --电机标定
-            MOTOR_get_pwm_zero();
+        //else if (command_2 == 0xD7)               ////灰色  --电机标定
+            //MOTOR_get_pwm_zero();
 
         Motor_set_need_to_save();
     }

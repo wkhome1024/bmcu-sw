@@ -45,14 +45,14 @@ uint64_t Assist_send_time = 3000; // 仅触发外侧后，送料时长
  * 霍尔传感器 MC_PULL_stu_raw , 在线状态 MC_ONLINE_key_stu_raw
  */
 
-#define BMCUMotor_version 1
+#define BMCUMotor_version 3
 #define use_flash_addr ((uint32_t)0x0800FA00)
 struct alignas(4) Motor_save_struct
 {
     uint32_t version = BMCUMotor_version;
     int pwm_zero[4] = {380, 380, 380, 380};
     uint64_t time_pull = 15000;
-
+    uint64_t time_pull_t1 = 8000;
 } motor_save;
 
 void MC_PWM_init()
@@ -601,9 +601,12 @@ bool Bmcucheck()
 }
 uint8_t lastnum = 0;
 
-void MOTOR_set_time_pull(uint64_t time1)
+void MOTOR_set_time_pull(bool select ,uint64_t time1)
 {
-    motor_save.time_pull = time1;
+    if (select)
+        motor_save.time_pull = time1;
+    else
+        motor_save.time_pull_t1 = time1;
 }
 
 void motor_motion_run()
@@ -611,10 +614,13 @@ void motor_motion_run()
     bool select = Bmcu_select();
     uint8_t num = get_now_filament_num();
     uint64_t time_now = get_time64();
-    uint64_t time_pull = 500;
-    if (motor_save.time_pull >= 14000)
-        time_pull = motor_save.time_pull / 2;
+    uint64_t time_pull = motor_save.time_pull_t1;
     uint64_t time_set = motor_save.time_pull - time_pull;
+    if (motor_save.time_pull < motor_save.time_pull_t1)
+    {
+        time_pull = motor_save.time_pull;
+        time_set = 0;
+    }
     uint64_t time_set_2 = time_now + time_set;
     uint64_t time_set_3 = time_now + time_pull;
 
