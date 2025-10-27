@@ -5,8 +5,8 @@
 struct alignas(4) Motor_save_struct
 {
     uint32_t version = BMCUMotor_version;
-    int pwm_zero[4] = {380, 380, 380, 380};
-    uint64_t time_pull = 15000;
+    int pwm_zero[4] = {300, 300, 300, 300};
+    uint64_t time_pull = 3000;
 
 } motor_save;
 
@@ -75,11 +75,11 @@ uint8_t PULL_key_change[4] = {0, 0, 0, 0};
 class MOTOR_PID
 {
 public:
-    float P = 1;
+    float P = 1.5;
     // float I = 1;
     float I = 10;
-    // float D = 0;
-    float D = 0.018;
+    float D = 0;
+    //float D = 0.018;
     float I_save = 0;
     float E_last = 0;
     float pid_MAX = PWM_lim;
@@ -431,11 +431,11 @@ void Motor_init()
     bool _init_ready = Motor_read();
     if (!_init_ready)
     {
-        motor_save.pwm_zero[0] = 380;
-        motor_save.pwm_zero[1] = 380;
-        motor_save.pwm_zero[2] = 380;
-        motor_save.pwm_zero[3] = 380;
-        motor_save.time_pull = 12000;
+        motor_save.pwm_zero[0] = 300;
+        motor_save.pwm_zero[1] = 300;
+        motor_save.pwm_zero[2] = 300;
+        motor_save.pwm_zero[3] = 300;
+        motor_save.time_pull = 3000;
         Motor_save();
     }
 
