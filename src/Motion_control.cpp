@@ -1,12 +1,12 @@
 #include "Motion_control.h"
 
-#define BMCUMotor_version 1
+#define BMCUMotor_version 2
 #define use_flash_addr ((uint32_t)0x0800FA00)
 struct alignas(4) Motor_save_struct
 {
     uint32_t version = BMCUMotor_version;
     int pwm_zero[4] = {300, 300, 300, 300};
-    uint64_t time_pull = 3000;
+    uint64_t time_pull = 500;
 
 } motor_save;
 
@@ -75,11 +75,11 @@ uint8_t PULL_key_change[4] = {0, 0, 0, 0};
 class MOTOR_PID
 {
 public:
-    float P = 1.5;
+    float P = 1;
     // float I = 1;
     float I = 10;
-    float D = 0;
-    //float D = 0.018;
+    //float D = 0;
+    float D = 0.01;
     float I_save = 0;
     float E_last = 0;
     float pid_MAX = PWM_lim;
@@ -435,7 +435,7 @@ void Motor_init()
         motor_save.pwm_zero[1] = 300;
         motor_save.pwm_zero[2] = 300;
         motor_save.pwm_zero[3] = 300;
-        motor_save.time_pull = 3000;
+        motor_save.time_pull = 500;
         Motor_save();
     }
 
@@ -557,7 +557,9 @@ void motor_motion_run()
     uint8_t num = get_now_filament_num();
     uint64_t time_now = get_time64();
     uint64_t time_pull = 500;
-    if (motor_save.time_pull > 14000)
+    if (motor_save.time_pull < 10000)
+        time_pull = motor_save.time_pull;
+    else 
         time_pull = motor_save.time_pull / 2;
     uint64_t time_set = motor_save.time_pull - time_pull;
     uint64_t time_set_2 = time_now + time_set;

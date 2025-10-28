@@ -1120,9 +1120,7 @@ void send_for_Set_filament(unsigned char *buf, int length)
     uint8_t read_num = buf[4];
     uint8_t command_1 = buf[5];
     uint8_t command_2 = buf[6];
-    static uint8_t t = 0;
-    if (BambuBus_address == 0x0700)
-        t = 4;
+
     if (command_1 == 0xE0)
         bmcu_reset = true;
 
@@ -1136,14 +1134,14 @@ void send_for_Set_filament(unsigned char *buf, int length)
             reset_filament_meters(read_num);
         else if (command_2 == 0xD9) // 黑色  --指定通道onuse
             set_filament_motion(read_num, on_use);
-        else if (command_2 == 0xD3 && read_num == 0) // 棕色  --电机退料时间设定
-            MOTOR_set_time_pull(10000 + (t * 1000));
+        else if (command_2 == 0xD3 && read_num == 0) // 棕色  --电机退料时间设定  --默认
+            MOTOR_set_time_pull(500);
         else if (command_2 == 0xD3 && read_num == 1) // 棕色  --电机退料时间设定
-            MOTOR_set_time_pull(11000 + (t * 1000));
-        else if (command_2 == 0xD3 && read_num == 2) // 棕色  --电机退料时间设定 --默认
-            MOTOR_set_time_pull(12000 + (t * 1000));
+            MOTOR_set_time_pull(5000);
+        else if (command_2 == 0xD3 && read_num == 2) // 棕色  --电机退料时间设定 
+            MOTOR_set_time_pull(10000);
         else if (command_2 == 0xD3 && read_num == 3) // 棕色  --电机退料时间设定
-            MOTOR_set_time_pull(13000 + (t * 1000));
+            MOTOR_set_time_pull(15000);
         else if (command_2 == 0xD5 && read_num == 0) ////岩石灰  --电机pwm 设定
             MOTOR_set_pwm_zero(220);
         else if (command_2 == 0xD5 && read_num == 1) ////岩石灰  --电机pwm 设定
