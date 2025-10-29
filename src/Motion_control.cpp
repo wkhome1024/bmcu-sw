@@ -78,8 +78,8 @@ public:
     float P = 1;
     // float I = 1;
     float I = 10;
-    //float D = 0;
-    float D = 0.01;
+    float D = 0;
+    //float D = 0.01;
     float I_save = 0;
     float E_last = 0;
     float pid_MAX = PWM_lim;
@@ -195,17 +195,17 @@ public:
         }
         else if (motion == 100) // onuse send 370 15 130 10
         {
-            speed_set = 15;
+            speed_set = 12;
         }
         else if (motion == -100) // onuse pull 370 15 130 10
         {
-            speed_set = -50;
+            speed_set = -20;
         }
 
         float x = PID.caculate(now_speed - speed_set, (float)(time_now - time_last) / 1000);
-        if (x > 1)
+        if (x > 5)
             x += pwm_zero;
-        else if (x < 1)
+        else if (x < -5)
             x -= pwm_zero;
         else
             x = 0;
@@ -250,13 +250,13 @@ void MC_PULL_key_init()
 uint8_t ONLINE_key_stu[4] = {0, 0, 0, 0};
 uint64_t ONLINE_key_stu_count[4] = {0, 0, 0, 0};
 uint8_t ONLINE_key_change[4] = {0, 0, 0, 0};
-// uint64_t ONLINE_key_change_count[4] = {0, 0, 0, 0};
+uint64_t ONLINE_key_change_count[4] = {0, 0, 0, 0};
 void MC_ONLINE_key_read(void)
 {
     uint8_t stu_read[4];
     uint64_t time_now = get_time64();
     uint64_t time_set = time_now + 5000;
-    // uint64_t time_set1 = time_now + 50;
+    uint64_t time_set1 = time_now + 50;
     stu_read[0] = digitalRead(PD0);
     stu_read[1] = digitalRead(PC15);
     stu_read[2] = digitalRead(PC14);
@@ -267,25 +267,26 @@ void MC_ONLINE_key_read(void)
         if (ONLINE_key_stu[i] == stu_read[i])
         {
             ONLINE_key_stu_count[i] = time_set;
-            // ONLINE_key_change_count[i] = time_set1;
         }
         else if (ONLINE_key_stu_count[i] < time_now)
         {
             ONLINE_key_stu[i] = stu_read[i];
         }
-        // else if (ONLINE_key_change_count[i] < time_now)   //防止微动抖动
-        // {
-        //     ONLINE_key_change[i] = stu_read[i];
-        //     ONLINE_key_change_count[i] = time_set1;
-        // }
+        if (ONLINE_key_change[i] == stu_read[i])
+        {
+            ONLINE_key_change_count[i] = time_set1;
+        }
+        else if (ONLINE_key_change_count[i] < time_now)   //50ms延迟防止微动抖动
+        {
+            ONLINE_key_change[i] = stu_read[i];
+        }
 
         if (stu_read[i] == 0)
         {
             ONLINE_key_stu[i] = stu_read[i];
-            // ONLINE_key_change[i] = stu_read[i];
+            ONLINE_key_change[i] = stu_read[i];
         }
 
-        ONLINE_key_change[i] = stu_read[i];
     }
 }
 void MC_ONLINE_key_init()
@@ -455,7 +456,7 @@ void Motion_control_init()
     Motor_init();
 }
 #define AS5600_PI 3.1415926535897932384626433832795
-#define speed_filter_k 10
+#define speed_filter_k 30
 float speed_as5600[4] = {0, 0, 0, 0};
 void AS5600_distance_updata()
 {
@@ -680,6 +681,8 @@ void motor_motion_run()
                     MOTOR_CONTROL[num].set_motion(100, 100);
                 else if (ONLINE_key_change[num] == 1)
                     MOTOR_CONTROL[num].set_motion(-100, 100);
+                else 
+                    MOTOR_CONTROL[num].set_motion(0, 100);
             }
 
             RGB_set(num, 0xFF, 0xFF, 0xFF);
