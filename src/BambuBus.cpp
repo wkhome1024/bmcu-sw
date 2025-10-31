@@ -1139,9 +1139,9 @@ void send_for_Set_filament(unsigned char *buf, int length)
         else if (command_2 == 0xD3 && read_num == 1) // 棕色  --电机退料时间设定
             MOTOR_set_time_pull(5000);
         else if (command_2 == 0xD3 && read_num == 2) // 棕色  --电机退料时间设定 
-            MOTOR_set_time_pull(10000);
+            MOTOR_set_time_pull(8000);
         else if (command_2 == 0xD3 && read_num == 3) // 棕色  --电机退料时间设定
-            MOTOR_set_time_pull(15000);
+            MOTOR_set_time_pull(12000);
         else if (command_2 == 0xD5 && read_num == 0) ////岩石灰  --电机pwm 设定
             MOTOR_set_pwm_zero(220);
         else if (command_2 == 0xD5 && read_num == 1) ////岩石灰  --电机pwm 设定
