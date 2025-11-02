@@ -723,15 +723,15 @@ void send_for_Cxx(unsigned char *buf, int length)
         return;*/
     if (data_save.bmcu != AMS_num)
     {
-        if (read_num < 4)
-            Bmcu_select_flag = false;
         return;
     }
-    else if (data_save.bmcu == AMS_num && !Bmcu_select_flag)
+    else
     {
-        if (read_num < 4)
+        if (read_num < 4 && !Bmcu_select_flag)
             Bmcu_select_flag = true;
-    } 
+        else if (read_num == 0xFF && statu_flags == 0x01 && Bmcu_select_flag)
+            Bmcu_select_flag = false;
+    }
 
     if (!set_motion(AMS_num, read_num, statu_flags, fliment_motion_flag))
         return;
@@ -841,11 +841,13 @@ void send_for_Dxx(unsigned char *buf, int length)
         }
         return;
     }
-    else if (data_save.bmcu == AMS_num && !Bmcu_select_flag)
+    else
     {
-        if (read_num < 4)
+        if (read_num < 4 && !Bmcu_select_flag)
             Bmcu_select_flag = true;
-    } 
+        else if (read_num == 0xFF && statu_flags == 0x01 && Bmcu_select_flag)
+            Bmcu_select_flag = false;
+    }
 
     if (!set_motion(AMS_num, read_num, statu_flags, fliment_motion_flag))
         return;
@@ -1191,7 +1193,7 @@ package_type BambuBus_run()
     static uint64_t time_set = 0;
     static uint64_t time_motion = 0;
     static uint64_t time_save = 0;
-    static uint64_t time_check = 0;
+    // static uint64_t time_check = 0;
     uint64_t timex = get_time64();
     // static bool save_s = false;
     /*for (auto i : data_save.filament)
@@ -1267,6 +1269,7 @@ package_type BambuBus_run()
         Bambubus_need_to_save = false;
     }
     // HAL_UART_Transmit(&use_Serial.handle,&s,1,1000);
+    /*
     if (time_check < timex - 180000 && time_check != 0)
     {
         if (!Bmcu_select_flag)
@@ -1281,7 +1284,9 @@ package_type BambuBus_run()
     else if (Bmcu_select_flag && filament_check())
     {
         time_check = timex;
-    }
+    }    
+    */
+
 
     // NFC_detect_run();
     return stu;
