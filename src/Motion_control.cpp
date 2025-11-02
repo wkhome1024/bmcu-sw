@@ -315,6 +315,11 @@ void Motion_control_set_PWM(uint8_t CHx, int PWM)
     {
         set2 = -PWM;
     }
+    else if (PWM == 0)
+    {
+        set1 = 1000;
+        set2 = 1000;
+    }
     switch (CHx)
     {
     case 3:
@@ -673,7 +678,7 @@ void motor_motion_run()
             }
             else if (MOTOR_CONTROL[num].get_motion() == 99)
             {
-                MOTOR_CONTROL[num].set_motion(2, 1000); // 保持压力延迟1000ms
+                MOTOR_CONTROL[num].set_motion(2, 2000); // 保持压力延迟2000ms
             }
             else if (MOTOR_CONTROL[num].get_motion() != 2 || PULL_key_stu[num] == 0)
             {
@@ -682,7 +687,7 @@ void motor_motion_run()
                 else if (ONLINE_key_change[num] == 1)
                     MOTOR_CONTROL[num].set_motion(-100, 100);
                 else 
-                    MOTOR_CONTROL[num].set_motion(0, 100);
+                    MOTOR_CONTROL[num].set_motion(99, 100);
             }
 
             RGB_set(num, 0xFF, 0xFF, 0xFF);
