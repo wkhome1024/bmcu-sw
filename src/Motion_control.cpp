@@ -169,9 +169,11 @@ public:
             Motion_control_set_PWM(CHx, 0);
             return;
         }
-        if (motion == 99) // 刹车
+        if (motion == 99 || motion == 3) // 刹车
         {
-            speed_set = 0;
+            PID.clear();
+            Motion_control_set_PWM(CHx, 1);
+            return;
         }
         if (motion == 1) // send 370 40  130 15
         {
@@ -179,7 +181,8 @@ public:
         }
         else if (motion == 2) // over pressure
         {
-            speed_set = 5;
+            Motion_control_set_PWM(CHx, -pwm_zero);
+            return;
         }
         else if (motion == -3) //  pull 进料重试
         {
@@ -315,7 +318,7 @@ void Motion_control_set_PWM(uint8_t CHx, int PWM)
     {
         set2 = -PWM;
     }
-    else if (PWM == 0)
+    else if (PWM == 1)
     {
         set1 = 1000;
         set2 = 1000;
@@ -628,7 +631,7 @@ void motor_motion_run()
                 }
                 else
                 {
-                    MOTOR_CONTROL[num].set_motion(99, 100);
+                    MOTOR_CONTROL[num].set_motion(3, 100);
                 }
             }
             if (send_count[num] > time_now && send_count[num] < time_now + 1000)
@@ -672,11 +675,7 @@ void motor_motion_run()
             break;
         case on_use:
             Pullcount_clear(num); // 注销 短回抽
-            if (MOTOR_CONTROL[num].get_motion() == 1)
-            {
-                MOTOR_CONTROL[num].set_motion(99, 150); // 停电机 清空pid
-            }
-            else if (MOTOR_CONTROL[num].get_motion() == 99)
+            if (MOTOR_CONTROL[num].get_motion() == 1 || MOTOR_CONTROL[num].get_motion() == 3)
             {
                 MOTOR_CONTROL[num].set_motion(2, 2000); // 保持压力延迟2000ms
             }
