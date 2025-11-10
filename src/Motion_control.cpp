@@ -70,7 +70,7 @@ void MC_PWM_init()
 
 uint8_t PULL_key_stu[4] = {0, 0, 0, 0};
 uint8_t PULL_key_change[4] = {0, 0, 0, 0};
-#define PWM_lim 980
+#define PWM_lim 780
 
 class MOTOR_PID
 {
@@ -165,21 +165,28 @@ public:
         {
             // Sendcount_clear(CHx);
             // set_filament_motion(CHx, idle);
-            PID.clear();
-            Motion_control_set_PWM(CHx, 0);
-            return;
+            if (get_filament_motion(CHx) == on_use)
+            {
+                PID.clear();
+                Motion_control_set_PWM(CHx, 1);  //刹车
+                return;
+            }
+            else
+            {
+                PID.clear();
+                Motion_control_set_PWM(CHx, 0);
+                return;
+            }
         }
-        if (motion == 99 || motion == 3) // 刹车
+        if (motion == 99) //输出保持
         {
-            PID.clear();
-            Motion_control_set_PWM(CHx, 1);
-            return;
+            return;           
         }
         if (motion == 1) // send 370 40  130 15
         {
             speed_set = 40;
         }
-        else if (motion == 2) // over pressure
+        else if (motion == 2  || motion == 3) // over pressure
         {
             Motion_control_set_PWM(CHx, -pwm_zero);
             return;
@@ -685,8 +692,6 @@ void motor_motion_run()
                     MOTOR_CONTROL[num].set_motion(100, 100);
                 else if (ONLINE_key_change[num] == 1)
                     MOTOR_CONTROL[num].set_motion(-100, 100);
-                else 
-                    MOTOR_CONTROL[num].set_motion(99, 100);
             }
 
             RGB_set(num, 0xFF, 0xFF, 0xFF);

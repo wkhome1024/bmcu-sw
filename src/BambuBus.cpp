@@ -587,8 +587,7 @@ bool set_motion(unsigned char AMS_num, unsigned char read_num, unsigned char sta
             {
                 for (auto i = 0; i < 4; i++)
                 {
-                    if (data_save.filament[AMS_num][i].motion_set != on_use)
-                        data_save.filament[AMS_num][i].motion_set = idle;
+                    data_save.filament[AMS_num][i].motion_set = idle;
                     data_save.filament[AMS_num][i].pressure = 0xFFFF;
                 }
             }
