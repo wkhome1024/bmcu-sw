@@ -471,7 +471,7 @@ void Motion_control_init()
     Motor_init();
 }
 #define AS5600_PI 3.1415926535897932384626433832795
-#define speed_filter_k 30
+#define speed_filter_k 10
 float speed_as5600[4] = {0, 0, 0, 0};
 void AS5600_distance_updata()
 {
@@ -689,9 +689,9 @@ void motor_motion_run()
             else if (MOTOR_CONTROL[num].get_motion() != 2 || PULL_key_stu[num] == 0)
             {
                 if (PULL_key_stu[num] == 0)
-                    MOTOR_CONTROL[num].set_motion(100, 100);
+                    MOTOR_CONTROL[num].set_motion(100, 50);
                 else if (ONLINE_key_change[num] == 1)
-                    MOTOR_CONTROL[num].set_motion(-100, 100);
+                    MOTOR_CONTROL[num].set_motion(0, 100);
             }
 
             RGB_set(num, 0xFF, 0xFF, 0xFF);
