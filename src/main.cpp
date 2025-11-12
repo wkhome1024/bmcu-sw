@@ -93,7 +93,7 @@ void loop()
             if (motion_run < time_now)
             {
                 Motion_control_run(error);
-                motion_run = time_now + 50;
+                motion_run = time_now + 10;
             }
             if (led_time < time_now)
             {

@@ -7,7 +7,7 @@ uint32_t AS5600_SDA[] = {PD0, PC15, PC14, PC13};
 // uint32_t AS5600_SCL[] = {PA6, PA4, PA2, PA0};
 // uint32_t AS5600_SDA[] = {PA7, PA5, PA3, PA1};
 #define AS5600_PI 3.1415926535897932384626433832795
-#define speed_filter_k 30
+#define speed_filter_k 10
 float speed_as5600[4] = {0, 0, 0, 0};
 
 /******************************     初始化 ADC       *******************************/
@@ -764,7 +764,7 @@ void motor_motion_run()
                 else if (MC_PULL_stu[num] == -2)
                     MOTOR_CONTROL[num].set_motion(200, 100);
                 else if (MC_PULL_stu[num] == 1)
-                    MOTOR_CONTROL[num].set_motion(-100, 100);
+                    MOTOR_CONTROL[num].set_motion(0, 100);
                 else if (MC_PULL_stu[num] == 2)
                     MOTOR_CONTROL[num].set_motion(-100, 100);
                 else if (MC_PULL_stu[num] == 0)
