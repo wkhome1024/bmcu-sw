@@ -7,7 +7,7 @@ CRC8 crc_8;
 uint8_t BambuBus_data_buf[500];
 int BambuBus_have_data = 0;
 uint16_t BambuBus_address = 0;
-//uint8_t AMS_num = 1;
+// uint8_t AMS_num = 1;
 bool bmcu_reset = false;
 bool Bmcu_filament_flag = false;
 bool Bmcu_select_flag = false;
@@ -473,12 +473,10 @@ uint8_t get_filament_left_char(uint8_t AMS_num)
         if (data_save.filament[AMS_num][i].statu == online)
         {
             data |= (0x1 << i) << i; // 1<<(2*i)
-            if (BambuBus_address == 0x700)
+
+            if (filament_channel_onpull[i])
             {
-                if (data_save.filament[AMS_num][i].motion_set != idle)
-                {
-                    data |= (0x2 << i) << i; // 2<<(2*i)
-                }
+                data |= (0x2 << i) << i; // 2<<(2*i)
             }
         }
     }
@@ -527,7 +525,6 @@ void set_motion_res_datas(unsigned char *set_buf, unsigned char AMS_num, unsigne
     set_buf[10] = get_filament_left_char(AMS_num);
 }
 
-
 bool set_motion(unsigned char AMS_num, unsigned char read_num, unsigned char statu_flags, unsigned char fliment_motion_flag)
 {
     if (BambuBus_address == 0x700) // AMS08
@@ -570,7 +567,7 @@ bool set_motion(unsigned char AMS_num, unsigned char read_num, unsigned char sta
                     data_save.filament[AMS_num][read_num].motion_set = pre_pull;
                 }
                 data_save.filament[AMS_num][read_num].pressure = 0x2B00;
-            }            
+            }
         }
         else if ((read_num == 0xFF))
         {
@@ -718,7 +715,7 @@ void send_for_Cxx(unsigned char *buf, int length)
     unsigned char statu_flags = buf[5];
     unsigned char fliment_motion_flag = buf[6];
     Cxx_res[0] = 0x7D;
-
+    Host_stu_update(buf[7], buf[8]); // 更新缓冲状态
     /*if (!set_motion(AMS_num, read_num, statu_flags, fliment_motion_flag))
         return;*/
     if (data_save.bmcu != AMS_num)
@@ -764,15 +761,6 @@ void send_for_Hit(unsigned char *buf, int length)
     else if ((buf[5] &= 0xC0) && BambuBus_address == 0)
     {
         BambuBus_address = 0x1200;
-    }
-
-    if ((buf[5] &= (0x01 << data_save.bmcu)))
-    {
-        Bmcu_filament_flag = true; // 五通耗材在线检测
-    }
-    else
-    {
-        Bmcu_filament_flag = false;
     }
     if (data_save.bmcu != AMS_num)
         return;
@@ -828,6 +816,7 @@ void send_for_Dxx(unsigned char *buf, int length)
     unsigned char statu_flags = buf[5];
     unsigned char fliment_motion_flag = buf[6];
     Dxx_res[0] = 0x7D;
+    Host_stu_update(buf[7], buf[8]); // 更新缓冲状态
     if (data_save.bmcu != AMS_num)
     {
         if (read_num != 0xFF)
@@ -1111,10 +1100,10 @@ void send_for_long_packge_version(unsigned char *buf, int length)
     // Bambubus_long_package_send(&data);
 }
 unsigned char s = 0x01;
-//unsigned char filament_res[] = {0x7D, 0x0A, 0x08,
-//                                0x00, 0x00, // amsnum + taynum
-//                                0x00, 0x00, // 公用控制位 + 专用控制位
-//                                0x00};      // crc8 校验
+// unsigned char filament_res[] = {0x7D, 0x0A, 0x08,
+//                                 0x00, 0x00, // amsnum + taynum
+//                                 0x00, 0x00, // 公用控制位 + 专用控制位
+//                                 0x00};      // crc8 校验
 unsigned char Set_filament_res[] = {0x3D, 0xC0, 0x08, 0xB2, 0x08, 0x60, 0xB4, 0x04};
 const unsigned char select_bmcu_filament_name[] = "TPU-AMS";                // ID: GFU02
 const unsigned char reset_bmcu_meter_color[4] = {0xFF, 0xFF, 0xFF, 0xFF};   // white
@@ -1143,10 +1132,10 @@ void send_for_Set_filament(unsigned char *buf, int length)
         else if (command_2 == 0xD9) // 黑色  --指定通道onuse
             set_filament_motion(read_num, on_use);
         else if (command_2 == 0xD3 && read_num == 0) // 棕色  --电机退料时间设定  --默认
-            MOTOR_set_time_pull(true ,1000 + (t * 1000));
+            MOTOR_set_time_pull(true, 1000 + (t * 1000));
         else if (command_2 == 0xD3 && read_num == 1) // 棕色  --电机退料时间设定
             MOTOR_set_time_pull(true, 4000 + (t * 1000));
-        else if (command_2 == 0xD3 && read_num == 2) // 棕色  --电机退料时间设定 
+        else if (command_2 == 0xD3 && read_num == 2) // 棕色  --电机退料时间设定
             MOTOR_set_time_pull(true, 7000 + (t * 1000));
         else if (command_2 == 0xD3 && read_num == 3) // 棕色  --电机退料时间设定
             MOTOR_set_time_pull(true, 10000 + (t * 1000));
@@ -1166,8 +1155,8 @@ void send_for_Set_filament(unsigned char *buf, int length)
             MOTOR_set_pwm_zero(380);
         else if (command_2 == 0xD7 && read_num == 3) ////灰色  --电机pwm 设定
             MOTOR_set_pwm_zero(460);
-        //else if (command_2 == 0xD7)               ////灰色  --电机标定
-            //MOTOR_get_pwm_zero();
+        // else if (command_2 == 0xD7)               ////灰色  --电机标定
+        // MOTOR_get_pwm_zero();
 
         Motor_set_need_to_save();
     }
@@ -1274,7 +1263,7 @@ package_type BambuBus_run()
     {
         if (!Bmcu_select_flag)
         {
-            time_check = 0; 
+            time_check = 0;
         }
         else if (Bmcu_select_flag && !filament_check())
         {
@@ -1284,9 +1273,8 @@ package_type BambuBus_run()
     else if (Bmcu_select_flag && filament_check())
     {
         time_check = timex;
-    }    
+    }
     */
-
 
     // NFC_detect_run();
     return stu;

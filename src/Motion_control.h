@@ -13,3 +13,5 @@ extern void Motor_set_need_to_save();
 extern void Motor_save();
 extern bool Motor_need_to_save();
 extern void MOTOR_get_pwm_zero();
+extern void Host_stu_update(uint8_t online_key , uint8_t pull_key);
+extern bool filament_channel_onpull[4];
