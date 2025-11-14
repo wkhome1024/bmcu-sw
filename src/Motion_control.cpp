@@ -219,7 +219,7 @@ public:
         }
         else if (motion == 2 || motion == 3) // over pressure
         {
-            speed_set = 5;
+            speed_set = 2;
         }
         else if (motion == -3) //  pull 进料重试
         {
@@ -557,6 +557,7 @@ uint64_t senddelay_count[4] = {0, 0, 0, 0}; // 长回抽
 uint64_t pulldelay_count[4] = {10, 10, 10, 10};
 uint64_t pullcheck_count[4] = {0, 0, 0, 0};
 uint8_t pullcheck[4] = {0, 0, 0, 0}; // 当前bmcu通道使用标记
+uint8_t pulldelay[4] = {0, 0, 0, 0};
 void Sendcount_clear(uint8_t CHx)
 {
     sendcheck_count[CHx] = 0;
@@ -688,6 +689,7 @@ void motor_motion_run()
         switch (get_filament_motion(num))
         {
         case need_send_out:
+            pulldelay[num] = 1;
             RGB_set(num, 0x00, 0xFF, 0x00);
             if (senddelay_count[num] == 0)
                 senddelay_count[num] = time_set_2;
@@ -748,6 +750,7 @@ void motor_motion_run()
             }
             break;
         case on_use:
+            pulldelay[num] = 0;
             Pullcount_clear(num); // 注销 短回抽
             if (MOTOR_CONTROL[num].get_motion() == 1)
             {
@@ -755,7 +758,7 @@ void motor_motion_run()
             }
             else if (MOTOR_CONTROL[num].get_motion() == 99 || MOTOR_CONTROL[num].get_motion() == 3)
             {
-                MOTOR_CONTROL[num].set_motion(2, 10000); // 保持压力延迟10s
+                MOTOR_CONTROL[num].set_motion(2, 2000); // 保持压力延迟2s
             }
             else if (MOTOR_CONTROL[num].get_motion() != 2 || MC_PULL_stu[num] < 0)
             {
@@ -777,6 +780,8 @@ void motor_motion_run()
             RGB_set(num, 0xFF, 0xFF, 0xFF);
             break;
         case pre_pull:
+            if (pulldelay[num])
+                break;
             RGB_set(num, 0xFF, 0x00, 0xFF);
             if (MC_PULL_stu[num] == -2)
                 MOTOR_CONTROL[num].set_motion(0, 100);
