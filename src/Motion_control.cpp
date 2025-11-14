@@ -70,7 +70,7 @@ void MC_PWM_init()
 
 uint8_t PULL_key_stu[4] = {0, 0, 0, 0};
 uint8_t PULL_key_change[4] = {0, 0, 0, 0};
-#define PWM_lim 780
+#define PWM_lim 820
 
 class MOTOR_PID
 {
@@ -518,6 +518,7 @@ uint64_t senddelay_count[4] = {0, 0, 0, 0}; // 长回抽
 uint64_t pulldelay_count[4] = {10, 10, 10, 10};
 uint64_t pullcheck_count[4] = {0, 0, 0, 0};
 uint64_t pullcheck[4] = {0, 0, 0, 0}; // 当前bmcu通道使用标记
+uint8_t pulldelay[4] = {0, 0, 0, 0};
 void Sendcount_clear(uint8_t CHx)
 {
     sendcheck_count[CHx] = 0;
@@ -561,7 +562,6 @@ bool Bmcucheck()
     return false;
 }
 uint8_t lastnum = 0;
-
 void MOTOR_set_time_pull(uint64_t time1)
 {
     motor_save.time_pull = time1;
@@ -621,6 +621,7 @@ void motor_motion_run()
         switch (get_filament_motion(num))
         {
         case need_send_out:
+            pulldelay[num] = 1;
             RGB_set(num, 0x00, 0xFF, 0x00);
             if (senddelay_count[num] == 0)
                 senddelay_count[num] = time_set_2;
@@ -681,6 +682,7 @@ void motor_motion_run()
             }
             break;
         case on_use:
+            pulldelay[num] = 0;
             Pullcount_clear(num); // 注销 短回抽
             if (MOTOR_CONTROL[num].get_motion() == 1 || MOTOR_CONTROL[num].get_motion() == 3)
             {
@@ -697,6 +699,8 @@ void motor_motion_run()
             RGB_set(num, 0xFF, 0xFF, 0xFF);
             break;
         case pre_pull:
+            if (pulldelay[num])
+                break;
             if (PULL_key_stu[num] == 0)
                 MOTOR_CONTROL[num].set_motion(0, 100);
             else if (ONLINE_key_change[num] == 1)
