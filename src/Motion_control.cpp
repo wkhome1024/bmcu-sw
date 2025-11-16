@@ -27,7 +27,7 @@ int MC_ONLINE_key_stu[4] = {3, 3, 3, 3};
 float PULL_voltage_up = 1.80f;   // 状态 压力高 红灯
 float PULL_voltage_down = 1.45f; // 状态 压力低 蓝灯
 // 微动触发控制相关常量
-float MC_PULL_voltage_pull = 1.60f;
+float MC_PULL_voltage_pull = 1.65f;
 bool Assist_send_filament[4] = {false, false, false, false};
 // bool pull_state_old = false; // 上次触发状态——True：未触发，False：进料完成
 // bool is_backing_out = false;
@@ -235,19 +235,7 @@ public:
         }
         else if (motion == 100) // onuse send 370 15 130 10
         {
-            speed_set = 15;
-        }
-        else if (motion == 200) // onuse send 370 25 130 15
-        {
             speed_set = 25;
-        }
-        else if (motion == -100) // onuse pull 370 15 130 10
-        {
-            speed_set = -30;
-        }
-        else if (motion == -200) // onuse pull 370 25 130 15
-        {
-            speed_set = -50;
         }
         else if (motion == 66) // onuse pressure
         {
@@ -762,15 +750,11 @@ void motor_motion_run()
             }
             else if (MOTOR_CONTROL[num].get_motion() != 2 || MC_PULL_stu[num] < 0)
             {
-                if (MC_PULL_stu[num] == -1)
+                if (MC_PULL_stu[num] == -2)
                     MOTOR_CONTROL[num].set_motion(100, 100);
-                else if (MC_PULL_stu[num] == -2)
-                    MOTOR_CONTROL[num].set_motion(200, 100);
-                else if (MC_PULL_stu[num] == 1)
-                    MOTOR_CONTROL[num].set_motion(0, 100);
                 else if (MC_PULL_stu[num] == 2)
-                    MOTOR_CONTROL[num].set_motion(-100, 100);
-                else if (MC_PULL_stu[num] == 0)
+                    MOTOR_CONTROL[num].set_motion(0, 100);
+                else
                     MOTOR_CONTROL[num].set_motion(66, 100);
             }
             if (MOTOR_CONTROL[num].get_motion() == 2 && MC_PULL_stu[num] == 2)
@@ -781,7 +765,10 @@ void motor_motion_run()
             break;
         case pre_pull:
             if (pulldelay[num])
-                break;
+            {
+                MOTOR_CONTROL[num].set_motion(2, 2000);
+                break;                
+            }
             RGB_set(num, 0xFF, 0x00, 0xFF);
             if (MC_PULL_stu[num] == -2)
                 MOTOR_CONTROL[num].set_motion(0, 100);
