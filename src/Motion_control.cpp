@@ -700,7 +700,10 @@ void motor_motion_run()
             break;
         case pre_pull:
             if (pulldelay[num])
-                break;
+            {
+                MOTOR_CONTROL[num].set_motion(2, 2000);
+                break;                
+            }
             if (PULL_key_stu[num] == 0)
                 MOTOR_CONTROL[num].set_motion(0, 100);
             else if (ONLINE_key_change[num] == 1)
