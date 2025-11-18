@@ -30,7 +30,7 @@ float Host_PULL_stu_raw = 0;
 float PULL_voltage_up = 1.80f;   // 状态 压力高 红灯
 float PULL_voltage_down = 1.45f; // 状态 压力低 蓝灯
 // 微动触发控制相关常量
-float MC_PULL_voltage_pull = 1.60f;
+float MC_PULL_voltage_pull = 1.65f;
 bool Assist_send_filament[4] = {false, false, false, false};
 // bool pull_state_old = false; // 上次触发状态——True：未触发，False：进料完成
 // bool is_backing_out = false;
@@ -50,7 +50,7 @@ bool filament_channel_onpull[4]={false,false,false,false};
 void Host_stu_update(uint8_t online_key, uint8_t pull_key)
 {
     static uint8_t online_key_old = 0;
-    static float pull_key_old = 0;
+    static float pull_stu_raw_old = 0;
     if ((online_key & 0xF0) == 0) 
         motor_ready = true;
     else
@@ -64,9 +64,9 @@ void Host_stu_update(uint8_t online_key, uint8_t pull_key)
     {
         Host_ONLINE_key_stu = online_key;
     }
-    float Host_temp = (float)((MC_PULL_stu_raw / 128) + 1.0f);  // 0~128 映射 1.0~3.0V
-    Host_PULL_stu_raw = pull_key_old * 0.5f + Host_temp * 0.5f; // 一阶低通滤波
-    pull_key_old = Host_PULL_stu_raw;
+    float Host_temp = (float)((pull_key / 128) + 1.0f);  // 0~128 映射 1.0~3.0V
+    Host_PULL_stu_raw = pull_stu_raw_old * 0.5f + Host_temp * 0.5f; // 一阶低通滤波
+    pull_stu_raw_old = Host_PULL_stu_raw;
 }
 
 #define BMCUMotor_version 3
@@ -258,7 +258,7 @@ public:
         }
         else if (motion == -4) // pull on low pressure
         {
-            speed_set = (MC_PULL_voltage_pull - 0.45f - MC_PULL_stu_raw[CHx]) * 50; // 线性压力反馈
+            speed_set = (MC_PULL_voltage_pull - 0.55f - MC_PULL_stu_raw[CHx]) * 100; // 线性压力反馈  1.1v
             if (speed_set < 5 && speed_set > 0)                                     // 防止电机抖动
                 speed_set = 0;
         }
@@ -268,19 +268,7 @@ public:
         }
         else if (motion == 100) // onuse send 370 15 130 10
         {
-            speed_set = 15;
-        }
-        else if (motion == 200) // onuse send 370 25 130 15
-        {
             speed_set = 25;
-        }
-        else if (motion == -100) // onuse pull 370 15 130 10
-        {
-            speed_set = -30;
-        }
-        else if (motion == -200) // onuse pull 370 25 130 15
-        {
-            speed_set = -50;
         }
         else if (motion == 66) // onuse pressure
         {
@@ -661,20 +649,21 @@ void motor_motion_run()
         if (senddelay_count[num] == 0)
             senddelay_count[num] = 1;
     }
-    if (num != lastnum)
+    if (num != lastnum && Host_ONLINE_key_stu == 0)    // 通道切换
     {
         if (pullcheck[lastnum] == 2)
         {
-            if (MOTOR_CONTROL[lastnum].get_motion() == -2)
-                MOTOR_CONTROL[lastnum].set_motion_add(-1, time_set); // 短回抽通道 退料
-            else if (MOTOR_CONTROL[lastnum].get_motion() == 0)
-                MOTOR_CONTROL[lastnum].set_motion(-1, time_set);
+            if (MOTOR_CONTROL[lastnum].get_motion() <= 0)
+                MOTOR_CONTROL[lastnum].set_motion(-1, time_set); // 短回抽通道 退料
         }
         Sendcount_clear(lastnum);
         lastnum = num;
         Pullcheck_clear();
     }
-
+    else if (num != lastnum && Host_ONLINE_key_stu > 0)
+    {
+        MOTOR_CONTROL[lastnum].set_motion(-4, 1000);
+    }
     if (Bmcu_reset())
     {
         for (int i = 0; i < 4; i++)
@@ -771,19 +760,13 @@ void motor_motion_run()
             }
             else if (MOTOR_CONTROL[num].get_motion() == 99 || MOTOR_CONTROL[num].get_motion() == 3)
             {
-                MOTOR_CONTROL[num].set_motion(2, 10000); // 保持压力延迟10s
+                MOTOR_CONTROL[num].set_motion(2, 2000); // 保持压力延迟2s
             }
             else if (MOTOR_CONTROL[num].get_motion() != 2 || MC_PULL_stu[num] < 0)
             {
-                if (MC_PULL_stu[num] == -1)
+                if (MC_PULL_stu[num] == -2)
                     MOTOR_CONTROL[num].set_motion(100, 100);
-                else if (MC_PULL_stu[num] == -2)
-                    MOTOR_CONTROL[num].set_motion(200, 100);
-                else if (MC_PULL_stu[num] == 1)
-                    MOTOR_CONTROL[num].set_motion(0, 100);
-                else if (MC_PULL_stu[num] == 2)
-                    MOTOR_CONTROL[num].set_motion(-100, 100);
-                else if (MC_PULL_stu[num] == 0)
+                else
                     MOTOR_CONTROL[num].set_motion(66, 100);
             }
             if (MOTOR_CONTROL[num].get_motion() == 2 && MC_PULL_stu[num] == 2)
@@ -794,7 +777,10 @@ void motor_motion_run()
         case pre_pull:
             RGB_set(num, 0xFF, 0x00, 0xFF);
             if (pulldelay[num])
-                break;
+            {
+                MOTOR_CONTROL[num].set_motion(2, 2000);
+                break;                
+            }
             if (MC_PULL_stu[num] == -2)
                 MOTOR_CONTROL[num].set_motion(0, 100);
             else
