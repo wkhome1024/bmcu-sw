@@ -682,11 +682,10 @@ void motor_motion_run()
             }
             break;
         case on_use:
-            pulldelay[num] = 0;
             Pullcount_clear(num); // 注销 短回抽
             if (MOTOR_CONTROL[num].get_motion() == 1 || MOTOR_CONTROL[num].get_motion() == 3)
             {
-                MOTOR_CONTROL[num].set_motion(2, 2000); // 保持压力延迟2000ms
+                MOTOR_CONTROL[num].set_motion(2, 5000); // 保持压力延迟5000ms
             }
             else if (MOTOR_CONTROL[num].get_motion() != 2 || PULL_key_stu[num] == 0)
             {
@@ -694,6 +693,7 @@ void motor_motion_run()
                     MOTOR_CONTROL[num].set_motion(100, 50);
                 else if (ONLINE_key_change[num] == 1)
                     MOTOR_CONTROL[num].set_motion(0, 100);
+                pulldelay[num] = 0;                    
             }
 
             RGB_set(num, 0xFF, 0xFF, 0xFF);
