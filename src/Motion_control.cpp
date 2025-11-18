@@ -244,7 +244,7 @@ public:
         }
         else if (motion == 3) // send on high pressure
         {
-            speed_set = (MC_PULL_voltage_pull + 0.25f - MC_PULL_stu_raw[CHx]) * 50; // 线性压力反馈
+            speed_set = (MC_PULL_voltage_pull + 0.4f - MC_PULL_stu_raw[CHx]) * 50; // 线性压力反馈
             if (speed_set < 0 && speed_set > -5)                                    // 防止电机抖动
                 speed_set = 0;
         }
@@ -752,7 +752,6 @@ void motor_motion_run()
             }
             break;
         case on_use:
-            pulldelay[num] = 0;
             RGB_set(num, 0xFF, 0xFF, 0xFF);
             if (MOTOR_CONTROL[num].get_motion() == 1)
             {
@@ -760,7 +759,7 @@ void motor_motion_run()
             }
             else if (MOTOR_CONTROL[num].get_motion() == 99 || MOTOR_CONTROL[num].get_motion() == 3)
             {
-                MOTOR_CONTROL[num].set_motion(2, 2000); // 保持压力延迟2s
+                MOTOR_CONTROL[num].set_motion(2, 5000); // 保持压力延迟5s
             }
             else if (MOTOR_CONTROL[num].get_motion() != 2 || MC_PULL_stu[num] < 0)
             {
@@ -768,6 +767,7 @@ void motor_motion_run()
                     MOTOR_CONTROL[num].set_motion(100, 100);
                 else
                     MOTOR_CONTROL[num].set_motion(66, 100);
+                pulldelay[num] = 0;
             }
             if (MOTOR_CONTROL[num].get_motion() == 2 && MC_PULL_stu[num] == 2)
             {
