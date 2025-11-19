@@ -1110,17 +1110,12 @@ const unsigned char reset_bmcu_meter_color[4] = {0xFF, 0xFF, 0xFF, 0xFF};   // w
 const unsigned char reset_bmcu_channel_color[4] = {0xFF, 0xF1, 0x44, 0xFF}; // 黄色
 void send_for_Set_filament(unsigned char *buf, int length)
 {
-
     uint8_t AMS_num = buf[3];
     uint8_t read_num = buf[4];
     uint8_t command_1 = buf[5];
     uint8_t command_2 = buf[6];
-    static uint8_t t = 0;
-    if (BambuBus_address == 0x0700)
-        t = 14;
     if (command_1 == 0xE0)
         bmcu_reset = true;
-
     if (data_save.bmcu != AMS_num)
     {
         return;
@@ -1131,22 +1126,22 @@ void send_for_Set_filament(unsigned char *buf, int length)
             reset_filament_meters(read_num);
         else if (command_2 == 0xD9) // 黑色  --指定通道onuse
             set_filament_motion(read_num, on_use);
-        else if (command_2 == 0xD3 && read_num == 0) // 棕色  --电机退料时间设定  --默认
-            MOTOR_set_time_pull(true, 1000 + (t * 1000));
+        else if (command_2 == 0xD3 && read_num == 0) // 棕色  --电机退料时间设定  --默认 15s
+            MOTOR_set_time_pull(true, 2000);
         else if (command_2 == 0xD3 && read_num == 1) // 棕色  --电机退料时间设定
-            MOTOR_set_time_pull(true, 4000 + (t * 1000));
+            MOTOR_set_time_pull(true, 18000);
         else if (command_2 == 0xD3 && read_num == 2) // 棕色  --电机退料时间设定
-            MOTOR_set_time_pull(true, 7000 + (t * 1000));
+            MOTOR_set_time_pull(true, 21000);
         else if (command_2 == 0xD3 && read_num == 3) // 棕色  --电机退料时间设定
-            MOTOR_set_time_pull(true, 10000 + (t * 1000));
+            MOTOR_set_time_pull(true, 24000);
         else if (command_2 == 0xD5 && read_num == 0) // 岩石灰  --电机退料时间设定
-            MOTOR_set_time_pull(false, 500);
-        else if (command_2 == 0xD5 && read_num == 1) // 岩石灰  --电机退料时间设定 --默认
+            MOTOR_set_time_pull(false, 2000);
+        else if (command_2 == 0xD5 && read_num == 1) // 岩石灰  --电机退料时间设定 --默认 8s
             MOTOR_set_time_pull(false, 8000);
         else if (command_2 == 0xD5 && read_num == 2) // 岩石灰  --电机退料时间设定
-            MOTOR_set_time_pull(false, 15000);
+            MOTOR_set_time_pull(false, 12000);
         else if (command_2 == 0xD5 && read_num == 3) // 岩石灰  --电机退料时间设定
-            MOTOR_set_time_pull(false, 21000);
+            MOTOR_set_time_pull(false, 20000);
         else if (command_2 == 0xD7 && read_num == 0) ////灰色  --电机pwm 设定
             MOTOR_set_pwm_zero(220);
         else if (command_2 == 0xD7 && read_num == 1) ////灰色  --电机pwm 设定

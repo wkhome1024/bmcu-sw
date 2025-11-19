@@ -39,7 +39,7 @@ uint64_t Assist_send_time = 3000; // 仅触发外侧后，送料时长
 // 退料距离 单位 MM
 // float_t P1X_OUT_filament_meters = 200.0f;                  // 内置200mm 外置700mm
 // float_t last_total_distance[4] = {0.0f, 0.0f, 0.0f, 0.0f}; // 初始化退料开始时的距离
-bool filament_channel_onpull[4]={false,false,false,false};
+bool filament_channel_onpull[4] = {false, false, false, false};
 // 使用双微动
 // bool is_two = true;
 
@@ -51,7 +51,7 @@ void Host_stu_update(uint8_t online_key, uint8_t pull_key)
 {
     static uint8_t online_key_old = 0;
     static float pull_stu_raw_old = 0;
-    if ((online_key & 0xF0) == 0) 
+    if ((online_key & 0xF0) == 0)
         motor_ready = true;
     else
         motor_ready = false;
@@ -64,12 +64,12 @@ void Host_stu_update(uint8_t online_key, uint8_t pull_key)
     {
         Host_ONLINE_key_stu = online_key;
     }
-    float Host_temp = (float)((pull_key / 128) + 1.0f);  // 0~128 映射 1.0~3.0V
+    float Host_temp = (float)((pull_key / 128) + 1.0f);             // 0~128 映射 1.0~3.0V
     Host_PULL_stu_raw = pull_stu_raw_old * 0.5f + Host_temp * 0.5f; // 一阶低通滤波
     pull_stu_raw_old = Host_PULL_stu_raw;
 }
 
-#define BMCUMotor_version 3
+#define BMCUMotor_version 4
 #define use_flash_addr ((uint32_t)0x0800FA00)
 struct alignas(4) Motor_save_struct
 {
@@ -245,7 +245,7 @@ public:
         else if (motion == 3) // send on high pressure
         {
             speed_set = (MC_PULL_voltage_pull + 0.4f - MC_PULL_stu_raw[CHx]) * 50; // 线性压力反馈
-            if (speed_set < 0 && speed_set > -5)                                    // 防止电机抖动
+            if (speed_set < 0 && speed_set > -5)                                   // 防止电机抖动
                 speed_set = 0;
         }
         else if (motion == 2) // over pressure
@@ -259,7 +259,7 @@ public:
         else if (motion == -4) // pull on low pressure
         {
             speed_set = (MC_PULL_voltage_pull - 0.55f - MC_PULL_stu_raw[CHx]) * 100; // 线性压力反馈  1.1v
-            if (speed_set < 5 && speed_set > 0)                                     // 防止电机抖动
+            if (speed_set < 5 && speed_set > 0)                                      // 防止电机抖动
                 speed_set = 0;
         }
         else if (motion == -1 || motion == -2) // pull 370 70 130 18
@@ -577,15 +577,10 @@ void AS5600_distance_updata()
     time_last = time_now;
 }
 uint64_t send_count[4] = {0, 0, 0, 0};
-uint64_t sendcheck_count[4] = {0, 0, 0, 0}; // 长回抽
-uint64_t senddelay_count[4] = {0, 0, 0, 0}; // 长回抽
+uint8_t sendcheck[4] = {0, 0, 0, 0}; 
+uint64_t senddelay_count[4] = {0, 0, 0, 0}; 
 uint8_t pulldelay[4] = {0, 0, 0, 0};
 uint8_t pullcheck[4] = {0, 0, 0, 0}; // 当前bmcu通道使用标记
-void Sendcount_clear(uint8_t CHx)
-{
-    sendcheck_count[CHx] = 0;
-    senddelay_count[CHx] = 0;
-}
 
 void Pullcheck_set(uint8_t CHx, int n)
 {
@@ -638,32 +633,30 @@ void motor_motion_run()
     uint64_t time_set = motor_save.time_pull - time_pull;
     if (motor_save.time_pull < motor_save.time_pull_t1)
     {
-        time_pull = motor_save.time_pull;
         time_set = 0;
     }
-    uint64_t time_set_2 = time_now + time_set;
-    uint64_t time_set_3 = time_now + time_pull;
-
-    if (!Pullcheck(num))
+    if (num != lastnum) // 通道切换
     {
-        if (senddelay_count[num] == 0)
-            senddelay_count[num] = 1;
-    }
-    if (num != lastnum && Host_ONLINE_key_stu == 0)    // 通道切换
-    {
-        if (pullcheck[lastnum] == 2)
+        if (pullcheck[lastnum] == 2 && Host_ONLINE_key_stu == 0)
         {
-            if (MOTOR_CONTROL[lastnum].get_motion() <= 0)
+            if (MOTOR_CONTROL[lastnum].get_motion() == 0)
                 MOTOR_CONTROL[lastnum].set_motion(-1, time_set); // 短回抽通道 退料
+            else if (MOTOR_CONTROL[lastnum].get_motion() < 0)
+            {
+                MOTOR_CONTROL[lastnum].set_motion_add(-1, time_set); // 短回抽通道 退料
+            }
+            Pullcheck_clear();
         }
-        Sendcount_clear(lastnum);
-        lastnum = num;
-        Pullcheck_clear();
+        else if (Host_ONLINE_key_stu > 0)
+        {
+            MOTOR_CONTROL[lastnum].set_motion(-4, 1000);
+        }
+        if (MOTOR_CONTROL[lastnum].get_motion() == 0)
+            lastnum = num;
+        MOTOR_CONTROL[lastnum].run(speed_as5600[lastnum]);
+        return;
     }
-    else if (num != lastnum && Host_ONLINE_key_stu > 0)
-    {
-        MOTOR_CONTROL[lastnum].set_motion(-4, 1000);
-    }
+
     if (Bmcu_reset())
     {
         for (int i = 0; i < 4; i++)
@@ -707,21 +700,17 @@ void motor_motion_run()
         case need_send_out:
             RGB_set(num, 0x00, 0xFF, 0x00);
             pulldelay[num] = 1;
-            if (senddelay_count[num] == 0)
-                senddelay_count[num] = time_set_2;
-            else if (senddelay_count[num] == 1)
-                senddelay_count[num] = time_set_3;
-            else if (!motor_ready && Host_ONLINE_key_stu == 0)  // 等待电机就绪
+            if (!motor_ready && Host_ONLINE_key_stu == 0) // 等待电机就绪
                 senddelay_count[num] = time_now + 500;
             if (senddelay_count[num] < time_now && MOTOR_CONTROL[num].get_motion() != -3)
             {
-                // if (sendcheck_count[num] == 0)
+                // if (sendcheck[num] == 0)
 
-                // if (sendcheck_count[num] > time_now && ONLINE_key_change[num] == 0)
+                // if (sendcheck[num] > time_now && ONLINE_key_change[num] == 0)
                 if (MC_PULL_stu[num] <= 1 && Host_ONLINE_key_stu == 0)
                 {
                     MOTOR_CONTROL[num].set_motion(1, 100);
-                    sendcheck_count[num] = 0;
+                    sendcheck[num] = 0;
                 }
                 else
                 {
@@ -733,12 +722,11 @@ void motor_motion_run()
                 if (MC_PULL_stu[num] > 1 && Host_ONLINE_key_stu == 0)
                     MOTOR_CONTROL[num].set_motion(-3, 1500);
             }
-            else if (MC_PULL_stu[num] > 1 && sendcheck_count[num] == 0) // 进料重试
+            else if (MC_PULL_stu[num] > 1 && sendcheck[num] == 0) // 进料重试
             {
                 send_count[num] = time_now + 3000;
-                sendcheck_count[num] = 1;
+                sendcheck[num] = 1;
             }
-
             break;
         case need_pull_back:
             RGB_set(num, 0xFF, 0x00, 0xFF);
@@ -750,6 +738,7 @@ void motor_motion_run()
             {
                 MOTOR_CONTROL[num].set_motion(-2, time_pull);
             }
+            Pullcheck_set(num, 2);
             break;
         case on_use:
             RGB_set(num, 0xFF, 0xFF, 0xFF);
@@ -779,7 +768,7 @@ void motor_motion_run()
             if (pulldelay[num])
             {
                 MOTOR_CONTROL[num].set_motion(2, 2000);
-                break;                
+                break;
             }
             if (MC_PULL_stu[num] == -2)
                 MOTOR_CONTROL[num].set_motion(0, 100);
@@ -787,18 +776,13 @@ void motor_motion_run()
                 MOTOR_CONTROL[num].set_motion(-4, 100);
             break;
         case idle:
-            Sendcount_clear(num);
             if (Host_ONLINE_key_stu > 1)
             {
                 MOTOR_CONTROL[num].set_motion(-4, time_pull); // 低压回抽
-                RGB_set(num, 0xFF, 0x00, 0xFF); // 紫灯
+                RGB_set(num, 0xFF, 0x00, 0xFF);               // 紫灯
                 Pullcheck_set(num, 2);
                 break;
             }
-            if (MOTOR_CONTROL[num].get_motion() == -1)
-                Pullcheck_set(num, 1);
-            else if (MOTOR_CONTROL[num].get_motion() == -2)
-                Pullcheck_set(num, 2);
             else if (MOTOR_CONTROL[num].get_motion() == -4)
                 MOTOR_CONTROL[num].set_motion(-2, time_pull);
             RGB_set(num, 0x00, 0x00, 0x37);
