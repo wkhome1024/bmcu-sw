@@ -62,6 +62,7 @@ uint8_t T_to_tangle(uint32_t time)
 int error = 0;
 uint64_t motion_run = 0;
 uint64_t led_time = 0;
+uint64_t error_time = 0;
 void loop()
 {
 
@@ -74,7 +75,15 @@ void loop()
             uint64_t time_now = get_time64();
             if (stu == BambuBus_package_ERROR) // offline
             {
-                error = -1;
+                if (error_time < time_now - 1000)
+                {
+                    error_time = time_now + 1000;
+                }
+                else if (time_now > error_time && error_time > time_now - 1000)
+                {
+                    error_time = 0;
+                    error = -1;                    
+                }
                 SYS_RGB.set_RGB(0x30, 0x00, 0x00, 0);
                 // RGB_update();
             }
@@ -100,8 +109,8 @@ void loop()
                 RGB_update();
                 led_time = time_now + 500;
             }
-            if (Motor_need_to_save())
-                Motor_save();
+
         }
+        delay(1);
     }
 }

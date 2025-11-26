@@ -11,7 +11,7 @@ uint32_t AS5600_SDA[] = {PD0, PC15, PC14, PC13};
 #define AS5600_PI 3.1415926535897932384626433832795
 #define speed_filter_k 10
 float speed_as5600[4] = {0, 0, 0, 0};
-
+uint8_t pullcheck[4] = {0, 0, 0, 0}; // 当前bmcu通道使用标记
 /******************************     初始化 ADC       *******************************/
 void MC_PULL_ONLINE_init()
 {
@@ -24,7 +24,7 @@ int MC_PULL_stu[4] = {0, 0, 0, 0};
 float MC_ONLINE_key_stu_raw[4] = {0, 0, 0, 0};
 // 0-离线 1-在线单微动触发 2-双微动触发 3-抖动
 int MC_ONLINE_key_stu[4] = {3, 3, 3, 3};
-int Host_ONLINE_key_stu = 3;
+int Host_ONLINE_key_stu = 0;
 float Host_PULL_stu_raw = 0;
 // 电压控制相关常量
 float PULL_voltage_up = 1.80f;   // 状态 压力高 红灯
@@ -50,33 +50,34 @@ bool filament_channel_onpull[4] = {false, false, false, false};
 void Host_stu_update(uint8_t online_key, uint8_t pull_key)
 {
     static uint8_t online_key_old = 0;
-    static float pull_stu_raw_old = 0;
     if ((online_key & 0xF0) == 0)
         motor_ready = true;
     else
         motor_ready = false;
     online_key &= 0x0F;
-    if (online_key != online_key_old) // 延迟更新
+    if (pull_key != 0)
     {
-        online_key_old = online_key;
+        if (online_key != online_key_old) // 延迟更新
+        {
+            online_key_old = online_key;
+        }
+        else
+        {
+            Host_ONLINE_key_stu = online_key;
+        }
+        Host_PULL_stu_raw = (float)((pull_key / 128) + 1.0f); // 0~128 映射 1.0~3.0V
     }
-    else
-    {
-        Host_ONLINE_key_stu = online_key;
-    }
-    float Host_temp = (float)((pull_key / 128) + 1.0f);             // 0~128 映射 1.0~3.0V
-    Host_PULL_stu_raw = pull_stu_raw_old * 0.5f + Host_temp * 0.5f; // 一阶低通滤波
-    pull_stu_raw_old = Host_PULL_stu_raw;
 }
 
-#define BMCUMotor_version 4
+#define BMCUMotor_version 6
 #define use_flash_addr ((uint32_t)0x0800FA00)
 struct alignas(4) Motor_save_struct
 {
-    uint32_t version = BMCUMotor_version;
-    int pwm_zero[4] = {380, 380, 380, 380};
-    uint64_t time_pull = 15000;
-    uint64_t time_pull_t1 = 8000;
+    uint8_t version = BMCUMotor_version;
+    uint16_t pwm_zero[4] = {380, 380, 380, 380};
+    uint8_t position[4] = {0, 0, 0, 0};
+    uint64_t time_pull = 8000;
+    uint64_t time_pull_t1 = 4000;
 } motor_save;
 
 void MC_PWM_init()
@@ -225,11 +226,16 @@ public:
             motion = 0;
             filament_channel_onpull[CHx] = false;
         }
-        if ((get_filament_online(CHx) == false))
+        if (get_filament_online(CHx) == false)
         {
+            pullcheck[CHx] = 0;
             set_filament_motion(CHx, idle);
+            speed_set = 0;
+            PID.clear();
+            Motion_control_set_PWM(CHx, 0);
+            time_last = time_now;
+            return;
         }
-
         if (motion == 99 || motion == 0) // 刹车
         {
             speed_set = 0;
@@ -244,7 +250,7 @@ public:
         }
         else if (motion == 3) // send on high pressure
         {
-            speed_set = (MC_PULL_voltage_pull + 0.4f - MC_PULL_stu_raw[CHx]) * 50; // 线性压力反馈
+            speed_set = (MC_PULL_voltage_pull + 0.4f - MC_PULL_stu_raw[CHx]) * 100; // 线性压力反馈
             if (speed_set < 0 && speed_set > -5)                                   // 防止电机抖动
                 speed_set = 0;
         }
@@ -256,11 +262,13 @@ public:
         {
             speed_set = -40;
         }
-        else if (motion == -4) // pull on low pressure
+        else if (motion == -66) // pull on low pressure
         {
-            speed_set = (MC_PULL_voltage_pull - 0.55f - MC_PULL_stu_raw[CHx]) * 100; // 线性压力反馈  1.1v
+            speed_set = (MC_PULL_voltage_pull - 0.55f - MC_PULL_stu_raw[CHx]) * 200; // 线性压力反馈  1.1v
             if (speed_set < 5 && speed_set > 0)                                      // 防止电机抖动
                 speed_set = 0;
+            else if (speed_set < -80)
+                speed_set = -80;
         }
         else if (motion == -1 || motion == -2) // pull 370 70 130 18
         {
@@ -289,9 +297,9 @@ public:
             x = PWM_lim;
         if (x < -PWM_lim)
             x = -PWM_lim;
-        if (now_speed > 0.5 || motion == 0 || now_speed < -0.5)
+        if (now_speed > 0.2 || motion == 0 || now_speed < -0.2 || time_set_speed < time_now - 10000)
         {
-            time_set_speed = time_now + 5000;
+            time_set_speed = time_now + 3000;
         }
         if (time_set_speed < time_now && time_set_speed != 0)
         {
@@ -334,9 +342,15 @@ void MC_PULL_ONLINE_read()
         }
         */
         if (hub_mode && Host_ONLINE_key_stu > 0)
+        {
             MC_PULL_stu_raw[i] = MC_PULL_stu_raw[i] * 0.5f + Host_PULL_stu_raw * 0.5f; // hub_mode模式下，压力值取本地和主控平均值
-
-        if (MC_PULL_stu_raw[i] > 2.0f) // 大于2V,表示压力过高
+            MC_PULL_voltage_pull = 1.5f;
+        }
+        else
+        {
+            MC_PULL_voltage_pull = 1.65f;
+        }
+        if (MC_PULL_stu_raw[i] > 1.95f) // 大于1.95V,表示压力过高
         {
             MC_PULL_stu[i] = 2;
             RGB_pull_check(i, 200, 0, 0); // 红灯
@@ -494,6 +508,10 @@ void Motor_set_need_to_save()
 }
 void Motor_save()
 {
+    for (int index = 0; index < 4; index++)
+    {
+        motor_save.position[index] = pullcheck[index];
+    }
     Flash_saves(&motor_save, sizeof(motor_save), use_flash_addr);
     motor_need_to_save = false;
 }
@@ -511,12 +529,12 @@ void Motor_init()
         motor_save.pwm_zero[1] = 380;
         motor_save.pwm_zero[2] = 380;
         motor_save.pwm_zero[3] = 380;
-        motor_save.time_pull = 15000;
         Motor_save();
     }
 
     for (int index = 0; index < 4; index++)
     {
+        pullcheck[index] = motor_save.position[index];
         Motion_control_set_PWM(index, 0);
         MOTOR_CONTROL[index].set_pwm_zero(motor_save.pwm_zero[index]);
     }
@@ -577,10 +595,10 @@ void AS5600_distance_updata()
     time_last = time_now;
 }
 uint64_t send_count[4] = {0, 0, 0, 0};
-uint8_t sendcheck[4] = {0, 0, 0, 0}; 
-uint64_t senddelay_count[4] = {0, 0, 0, 0}; 
+uint8_t sendcheck[4] = {0, 0, 0, 0};
+uint64_t senddelay_count[4] = {0, 0, 0, 0};
+uint64_t pullcheck_count[4] = {0, 0, 0, 0};
 uint8_t pulldelay[4] = {0, 0, 0, 0};
-uint8_t pullcheck[4] = {0, 0, 0, 0}; // 当前bmcu通道使用标记
 
 void Pullcheck_set(uint8_t CHx, int n)
 {
@@ -591,6 +609,7 @@ void Pullcheck_clear()
     for (int i = 0; i < 4; i++)
     {
         pullcheck[i] = 0;
+        pullcheck_count[i] = 0;
     }
 }
 bool Pullcheck(uint8_t CHx)
@@ -630,11 +649,7 @@ void motor_motion_run()
     uint8_t num = get_now_filament_num();
     uint64_t time_now = get_time64();
     uint64_t time_pull = motor_save.time_pull_t1;
-    uint64_t time_set = motor_save.time_pull - time_pull;
-    if (motor_save.time_pull < motor_save.time_pull_t1)
-    {
-        time_set = 0;
-    }
+    uint64_t time_set = motor_save.time_pull;
     if (num != lastnum) // 通道切换
     {
         if (pullcheck[lastnum] == 2 && Host_ONLINE_key_stu == 0)
@@ -649,10 +664,18 @@ void motor_motion_run()
         }
         else if (Host_ONLINE_key_stu > 0)
         {
-            MOTOR_CONTROL[lastnum].set_motion(-4, 1000);
+            MOTOR_CONTROL[lastnum].set_motion(-4, time_pull);
         }
         if (MOTOR_CONTROL[lastnum].get_motion() == 0)
+        {
             lastnum = num;
+            return;
+        }
+        else if (MOTOR_CONTROL[lastnum].get_motion() < 0 && MC_ONLINE_key_stu[lastnum] < 2)
+        {
+            MOTOR_CONTROL[lastnum].set_motion(1, 500);
+            lastnum = num;
+        }
         MOTOR_CONTROL[lastnum].run(speed_as5600[lastnum]);
         return;
     }
@@ -691,6 +714,14 @@ void motor_motion_run()
             { // 如果滑块被人为拉动，做出对应响应
                 MOTOR_CONTROL[i].set_motion(-1, 100);
             }
+        }
+        if (pullcheck_count[num] > time_now)
+        {
+            if (Host_ONLINE_key_stu > 1 && MOTOR_CONTROL[num].get_motion() < 0)
+                MOTOR_CONTROL[num].set_motion(-66, time_pull); // 低压回抽
+            else if (MOTOR_CONTROL[num].get_motion() == -66)
+                MOTOR_CONTROL[num].set_motion(-2, time_pull);
+            RGB_set(num, 0xFF, 0x00, 0xFF); // 紫灯
         }
     }
     else if (get_filament_online(num))
@@ -732,13 +763,14 @@ void motor_motion_run()
             RGB_set(num, 0xFF, 0x00, 0xFF);
             if (Host_ONLINE_key_stu > 0)
             {
-                MOTOR_CONTROL[num].set_motion(-4, 5000); // 低压回抽
+                MOTOR_CONTROL[num].set_motion(-66, 1000); // 低压回抽
             }
             else if (Host_ONLINE_key_stu == 0)
             {
                 MOTOR_CONTROL[num].set_motion(-2, time_pull);
             }
             Pullcheck_set(num, 2);
+            pullcheck_count[num] = time_now + 15000;
             break;
         case on_use:
             RGB_set(num, 0xFF, 0xFF, 0xFF);
@@ -773,19 +805,22 @@ void motor_motion_run()
             if (MC_PULL_stu[num] == -2)
                 MOTOR_CONTROL[num].set_motion(0, 100);
             else
-                MOTOR_CONTROL[num].set_motion(-4, 100);
+                MOTOR_CONTROL[num].set_motion(-66, 100);
             break;
         case idle:
-            if (Host_ONLINE_key_stu > 1)
+            if (pullcheck_count[num] > time_now)
             {
-                MOTOR_CONTROL[num].set_motion(-4, time_pull); // 低压回抽
-                RGB_set(num, 0xFF, 0x00, 0xFF);               // 紫灯
-                Pullcheck_set(num, 2);
-                break;
+                if (Host_ONLINE_key_stu > 1 && MOTOR_CONTROL[num].get_motion() < 0)
+                    MOTOR_CONTROL[num].set_motion(-66, time_pull); // 低压回抽
+                else if (MOTOR_CONTROL[num].get_motion() == -66)
+                    MOTOR_CONTROL[num].set_motion(-2, time_pull);
+                RGB_set(num, 0xFF, 0x00, 0xFF); // 紫灯
             }
-            else if (MOTOR_CONTROL[num].get_motion() == -4)
-                MOTOR_CONTROL[num].set_motion(-2, time_pull);
-            RGB_set(num, 0x00, 0x00, 0x37);
+            else
+            {
+                MOTOR_CONTROL[num].set_motion(0, 100);
+                RGB_set(num, 0x00, 0x00, 0x37);
+            }
             break;
         }
     }
@@ -867,6 +902,7 @@ void Motion_control_run(int error)
         for (int i = 0; i < 4; i++)
         {
             set_filament_online(i, false);
+            // MOTOR_CONTROL[i].set_motion(0, 100);
             if (MC_PULL_stu[i] == -2)
             {
                 RGB_set(i, 0xFF, 0x00, 0x00); // 红灯
