@@ -264,7 +264,7 @@ public:
         }
         else if (motion == -66) // pull on low pressure
         {
-            speed_set = (MC_PULL_voltage_pull - 0.55f - MC_PULL_stu_raw[CHx]) * 200; // 线性压力反馈  1.1v
+            speed_set = (MC_PULL_voltage_pull - 0.55f - MC_PULL_stu_raw[CHx]) * 150; // 线性压力反馈  1.1v
             if (speed_set < 5 && speed_set > 0)                                      // 防止电机抖动
                 speed_set = 0;
             else if (speed_set < -80)
@@ -535,6 +535,8 @@ void Motor_init()
     for (int index = 0; index < 4; index++)
     {
         pullcheck[index] = motor_save.position[index];
+        if (pullcheck[index] == 2)
+            set_now_filament_num(index);
         Motion_control_set_PWM(index, 0);
         MOTOR_CONTROL[index].set_pwm_zero(motor_save.pwm_zero[index]);
     }
@@ -652,6 +654,11 @@ void motor_motion_run()
     uint64_t time_set = motor_save.time_pull;
     if (num != lastnum) // 通道切换
     {
+        if (get_filament_motion(num) == on_use)   //意外掉线
+        {
+            lastnum = num;
+            return;
+        }
         if (pullcheck[lastnum] == 2 && Host_ONLINE_key_stu == 0)
         {
             if (MOTOR_CONTROL[lastnum].get_motion() == 0)
@@ -662,9 +669,9 @@ void motor_motion_run()
             }
             Pullcheck_clear();
         }
-        else if (Host_ONLINE_key_stu > 0)
+        else if (pullcheck[lastnum] == 2 && Host_ONLINE_key_stu > 0)
         {
-            MOTOR_CONTROL[lastnum].set_motion(-4, time_pull);
+            MOTOR_CONTROL[lastnum].set_motion(-66, time_pull);
         }
         if (MOTOR_CONTROL[lastnum].get_motion() == 0)
         {
@@ -717,7 +724,7 @@ void motor_motion_run()
         }
         if (pullcheck_count[num] > time_now)
         {
-            if (Host_ONLINE_key_stu > 1 && MOTOR_CONTROL[num].get_motion() < 0)
+            if (Host_ONLINE_key_stu > 1)
                 MOTOR_CONTROL[num].set_motion(-66, time_pull); // 低压回抽
             else if (MOTOR_CONTROL[num].get_motion() == -66)
                 MOTOR_CONTROL[num].set_motion(-2, time_pull);
@@ -730,6 +737,7 @@ void motor_motion_run()
         {
         case need_send_out:
             RGB_set(num, 0x00, 0xFF, 0x00);
+            pullcheck_count[num] = 0;
             pulldelay[num] = 1;
             if (!motor_ready && Host_ONLINE_key_stu == 0) // 等待电机就绪
                 senddelay_count[num] = time_now + 500;
@@ -763,14 +771,14 @@ void motor_motion_run()
             RGB_set(num, 0xFF, 0x00, 0xFF);
             if (Host_ONLINE_key_stu > 0)
             {
-                MOTOR_CONTROL[num].set_motion(-66, 1000); // 低压回抽
+                MOTOR_CONTROL[num].set_motion(-66, time_pull); // 低压回抽
             }
             else if (Host_ONLINE_key_stu == 0)
             {
                 MOTOR_CONTROL[num].set_motion(-2, time_pull);
             }
             Pullcheck_set(num, 2);
-            pullcheck_count[num] = time_now + 15000;
+            pullcheck_count[num] = time_now + 20000;
             break;
         case on_use:
             RGB_set(num, 0xFF, 0xFF, 0xFF);
@@ -810,7 +818,7 @@ void motor_motion_run()
         case idle:
             if (pullcheck_count[num] > time_now)
             {
-                if (Host_ONLINE_key_stu > 1 && MOTOR_CONTROL[num].get_motion() < 0)
+                if (Host_ONLINE_key_stu > 1)
                     MOTOR_CONTROL[num].set_motion(-66, time_pull); // 低压回抽
                 else if (MOTOR_CONTROL[num].get_motion() == -66)
                     MOTOR_CONTROL[num].set_motion(-2, time_pull);
@@ -818,7 +826,7 @@ void motor_motion_run()
             }
             else
             {
-                MOTOR_CONTROL[num].set_motion(0, 100);
+                //MOTOR_CONTROL[num].set_motion(0, 100);
                 RGB_set(num, 0x00, 0x00, 0x37);
             }
             break;
@@ -901,7 +909,7 @@ void Motion_control_run(int error)
     {
         for (int i = 0; i < 4; i++)
         {
-            set_filament_online(i, false);
+            //set_filament_online(i, false);
             // MOTOR_CONTROL[i].set_motion(0, 100);
             if (MC_PULL_stu[i] == -2)
             {

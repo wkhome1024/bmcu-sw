@@ -1141,7 +1141,7 @@ package_type BambuBus_run()
         {
         case BambuBus_package_heartbeat:
             send_for_Hit(buf_X, data_length);
-            time_set = timex + 1000;
+            time_set = timex + 2000;
             break;
         case BambuBus_package_filament_motion_short:
             send_for_Cxx(buf_X, data_length);
@@ -1195,7 +1195,7 @@ package_type BambuBus_run()
             if (Bambubus_need_to_save)
             {
                 Bambubus_save();
-                time_set = get_time64() + 1000;
+                time_set = get_time64() + 2000;
                 Bambubus_save_flag = false;
             }
             if (Motor_need_to_save())
