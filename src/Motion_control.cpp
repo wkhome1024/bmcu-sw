@@ -67,6 +67,11 @@ void Host_stu_update(uint8_t online_key, uint8_t pull_key)
         }
         Host_PULL_stu_raw = (float)((pull_key / 128) + 1.0f); // 0~128 映射 1.0~3.0V
     }
+    else
+    {
+        Host_ONLINE_key_stu = 0;
+        Host_PULL_stu_raw = 1.5f;
+    }
 }
 
 #define BMCUMotor_version 6
@@ -250,7 +255,7 @@ public:
         }
         else if (motion == 3) // send on high pressure
         {
-            speed_set = (MC_PULL_voltage_pull + 0.4f - MC_PULL_stu_raw[CHx]) * 100; // 线性压力反馈
+            speed_set = (2.0f - MC_PULL_stu_raw[CHx]) * 100; // 高压力反馈
             if (speed_set < 0 && speed_set > -5)                                   // 防止电机抖动
                 speed_set = 0;
         }
@@ -264,7 +269,7 @@ public:
         }
         else if (motion == -66) // pull on low pressure
         {
-            speed_set = (MC_PULL_voltage_pull - 0.55f - MC_PULL_stu_raw[CHx]) * 150; // 线性压力反馈  1.1v
+            speed_set = (1.1f - Host_PULL_stu_raw) * 150; // 线性压力反馈  1.1v
             if (speed_set < 5 && speed_set > 0)                                      // 防止电机抖动
                 speed_set = 0;
             else if (speed_set < -80)
@@ -341,14 +346,9 @@ void MC_PULL_ONLINE_read()
             DEBUG_MY("   \n");
         }
         */
-        if (hub_mode && Host_ONLINE_key_stu > 0)
+        if (hub_mode == 2 && Host_ONLINE_key_stu > 0)
         {
-            MC_PULL_stu_raw[i] = MC_PULL_stu_raw[i] * 0.5f + Host_PULL_stu_raw * 0.5f; // hub_mode模式下，压力值取本地和主控平均值
-            MC_PULL_voltage_pull = 1.5f;
-        }
-        else
-        {
-            MC_PULL_voltage_pull = 1.65f;
+            MC_PULL_stu_raw[i] = Host_PULL_stu_raw; // hub_mode模式下，压力值取主控值
         }
         if (MC_PULL_stu_raw[i] > 1.95f) // 大于1.95V,表示压力过高
         {
@@ -555,6 +555,10 @@ void Motion_control_init()
     MC_AS5600.init(AS5600_SCL, AS5600_SDA, 4);
     MC_AS5600.updata_angle();
     Motor_init();
+    if (hub_mode == 1)
+        MC_PULL_voltage_pull = 1.75f;
+    else if (hub_mode == 2)
+        MC_PULL_voltage_pull = 1.5f;
 }
 
 void AS5600_distance_updata()
