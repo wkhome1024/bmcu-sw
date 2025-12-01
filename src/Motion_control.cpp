@@ -256,7 +256,7 @@ public:
         else if (motion == 3) // send on high pressure
         {
             speed_set = (2.0f - MC_PULL_stu_raw[CHx]) * 100; // 高压力反馈
-            if (speed_set < 0 && speed_set > -5)                                   // 防止电机抖动
+            if (speed_set < 0 && speed_set > -5)             // 防止电机抖动
                 speed_set = 0;
         }
         else if (motion == 2) // over pressure
@@ -270,7 +270,7 @@ public:
         else if (motion == -66) // pull on low pressure
         {
             speed_set = (1.1f - Host_PULL_stu_raw) * 150; // 线性压力反馈  1.1v
-            if (speed_set < 5 && speed_set > 0)                                      // 防止电机抖动
+            if (speed_set < 5 && speed_set > 0)           // 防止电机抖动
                 speed_set = 0;
             else if (speed_set < -80)
                 speed_set = -80;
@@ -556,7 +556,7 @@ void Motion_control_init()
     MC_AS5600.updata_angle();
     Motor_init();
     if (hub_mode == 1)
-        MC_PULL_voltage_pull = 1.75f;
+        MC_PULL_voltage_pull = 1.65f;
     else if (hub_mode == 2)
         MC_PULL_voltage_pull = 1.5f;
 }
@@ -658,7 +658,7 @@ void motor_motion_run()
     uint64_t time_set = motor_save.time_pull;
     if (num != lastnum) // 通道切换
     {
-        if (get_filament_motion(num) == on_use)   //意外掉线
+        if (get_filament_motion(num) == on_use) // 意外掉线
         {
             lastnum = num;
             return;
@@ -731,7 +731,10 @@ void motor_motion_run()
             if (Host_ONLINE_key_stu > 1)
                 MOTOR_CONTROL[num].set_motion(-66, time_pull); // 低压回抽
             else if (MOTOR_CONTROL[num].get_motion() == -66)
+            {
                 MOTOR_CONTROL[num].set_motion(-2, time_pull);
+                pullcheck_count[num] = 0;
+            }
             RGB_set(num, 0xFF, 0x00, 0xFF); // 紫灯
         }
     }
@@ -782,7 +785,7 @@ void motor_motion_run()
                 MOTOR_CONTROL[num].set_motion(-2, time_pull);
             }
             Pullcheck_set(num, 2);
-            pullcheck_count[num] = time_now + 20000;
+            pullcheck_count[num] = time_now + 30000;
             break;
         case on_use:
             RGB_set(num, 0xFF, 0xFF, 0xFF);
@@ -798,6 +801,8 @@ void motor_motion_run()
             {
                 if (MC_PULL_stu[num] == -2)
                     MOTOR_CONTROL[num].set_motion(100, 100);
+                else if (MC_PULL_stu[num] > 0)
+                    MOTOR_CONTROL[num].set_motion(0, 100);
                 else
                     MOTOR_CONTROL[num].set_motion(66, 100);
                 pulldelay[num] = 0;
@@ -825,12 +830,15 @@ void motor_motion_run()
                 if (Host_ONLINE_key_stu > 1)
                     MOTOR_CONTROL[num].set_motion(-66, time_pull); // 低压回抽
                 else if (MOTOR_CONTROL[num].get_motion() == -66)
+                {
                     MOTOR_CONTROL[num].set_motion(-2, time_pull);
+                    pullcheck_count[num] = 0;
+                }
                 RGB_set(num, 0xFF, 0x00, 0xFF); // 紫灯
             }
             else
             {
-                //MOTOR_CONTROL[num].set_motion(0, 100);
+                // MOTOR_CONTROL[num].set_motion(0, 100);
                 RGB_set(num, 0x00, 0x00, 0x37);
             }
             break;
@@ -913,8 +921,8 @@ void Motion_control_run(int error)
     {
         for (int i = 0; i < 4; i++)
         {
-            //set_filament_online(i, false);
-            // MOTOR_CONTROL[i].set_motion(0, 100);
+            // set_filament_online(i, false);
+            //  MOTOR_CONTROL[i].set_motion(0, 100);
             if (MC_PULL_stu[i] == -2)
             {
                 RGB_set(i, 0xFF, 0x00, 0x00); // 红灯
