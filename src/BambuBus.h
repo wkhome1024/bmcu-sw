@@ -1,7 +1,7 @@
 #pragma once
 
 #include "main.h"
-#define Bambubus_version 5
+#define Bambubus_version 6
 
 #ifdef __cplusplus
 extern "C"
