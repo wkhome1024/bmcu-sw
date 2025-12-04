@@ -187,16 +187,14 @@ void inline RX_IRQ(unsigned char _RX_IRQ_data)
 DMA_InitTypeDef Bambubus_DMA_InitStructure;
 void send_uart(const unsigned char *data, uint16_t length)
 {
-    DMA_DeInit(DMA1_Channel4);
     // Configure DMA1 channel 4 for USART1 TX
-    Bambubus_DMA_InitStructure.DMA_MemoryBaseAddr = (uint32_t)data;
-    Bambubus_DMA_InitStructure.DMA_BufferSize = length;
-    DMA_Init(DMA1_Channel4, &Bambubus_DMA_InitStructure);
-    DMA_Cmd(DMA1_Channel4, ENABLE);
+    DMA1_Channel4->CFGR &= (uint16_t)(~DMA_CFGR1_EN); // 关闭通道
+    DMA1_Channel4->MADDR = (uint32_t)data;            // 更新内存地址
+    DMA1_Channel4->CNTR = length;                     // 更新传输长度
+    DMA1_Channel4->CFGR |= DMA_CFGR1_EN;              // 重新使能
     GPIOA->BSHR = GPIO_Pin_12;
     // Enable USART1 DMA send
-    delay(1); // 保持差分电压
-    USART_DMACmd(USART1, USART_DMAReq_Tx, ENABLE);
+    USART1->CTLR3 |= USART_DMAReq_Tx;
 }
 
 void BambuBUS_UART_Init()
@@ -252,7 +250,7 @@ void BambuBUS_UART_Init()
     Bambubus_DMA_InitStructure.DMA_MemoryDataSize = DMA_MemoryDataSize_Byte;
     Bambubus_DMA_InitStructure.DMA_PeripheralDataSize = DMA_PeripheralDataSize_Byte;
     Bambubus_DMA_InitStructure.DMA_BufferSize = 0;
-
+    DMA_Init(DMA1_Channel4, &Bambubus_DMA_InitStructure);
     USART_Cmd(USART1, ENABLE);
 }
 
@@ -289,17 +287,19 @@ void BambuBus_init()
         data_save.filament[3].color_R = 0x16;
         data_save.filament[3].color_G = 0x16;
         data_save.filament[3].color_B = 0x16;
+
+        Bambubus_save();
     }
     for (auto &i : data_save.filament)
     {
 
 #ifdef _Bambubus_DEBUG_mode_
-            j.statu = online;
+            i.statu = online;
 #else
-            j.statu = offline;
+            i.statu = offline;
 #endif // DEBUG
 
-            j.motion_set = idle;
+            i.motion_set = idle;
         
     }
 
@@ -593,7 +593,7 @@ void send_for_Hit(unsigned char *buf, int length)
     if (data_save.bmcu != AMS_num)
         return;
 
-    set_motion_res_datas(Hit_res + 2, AMS_num, read_num);
+    set_motion_res_datas(Hit_res + 2, AMS_num, read_num, 0);
     package_send_with_crc(Hit_res, sizeof(Hit_res));
 }
 // 3D E0 3C 12 04 00 00 00 00 09 09 09 00 00 00 00 00 00 00
@@ -666,7 +666,7 @@ void send_for_Cxx(unsigned char *buf, int length)
     if (!set_motion(AMS_num, read_num, statu_flags, fliment_motion_flag))
         return;
 
-    set_motion_res_datas(Cxx_res + 2, AMS_num, read_num);
+    set_motion_res_datas(Cxx_res + 2, AMS_num, read_num, statu_flags);
     package_send_with_crc(Cxx_res, sizeof(Cxx_res));
 
     if (package_num < 20)
@@ -766,7 +766,7 @@ void send_for_Dxx(unsigned char *buf, int length)
     }
     else*/
 
-    set_motion_res_datas(Dxx_res + 2, AMS_num, read_num);
+    set_motion_res_datas(Dxx_res + 2, AMS_num, read_num, statu_flags);
     package_send_with_crc(Dxx_res, sizeof(Dxx_res));
     if (package_num < 20)
         package_num++;
