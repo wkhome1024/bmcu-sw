@@ -647,6 +647,15 @@ void send_for_Cxx(unsigned char *buf, int length)
         return;*/
     if (data_save.bmcu != AMS_num)
     {
+        if (read_num != 0xFF)
+        {
+            Bmcu_select_flag = false;
+            for (int i = 0; i < 4; i++)
+            {
+                if (data_save.filament[i].motion_set == need_pull_back)
+                    set_filament_motion(i, idle);
+            }
+        }
         return;
     }
     else
@@ -726,7 +735,7 @@ void send_for_Dxx(unsigned char *buf, int length)
     {
         if (read_num != 0xFF)
         {
-            // Bmcu_select_flag = false;
+            Bmcu_select_flag = false;
             for (int i = 0; i < 4; i++)
             {
                 if (data_save.filament[i].motion_set == need_pull_back)

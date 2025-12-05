@@ -604,6 +604,7 @@ uint64_t send_count[4] = {0, 0, 0, 0};
 uint8_t sendcheck[4] = {0, 0, 0, 0};
 uint64_t senddelay_count[4] = {0, 0, 0, 0};
 uint64_t pullcheck_count[4] = {0, 0, 0, 0};
+uint64_t pull_count[4] = {0, 0, 0, 0};
 uint8_t pulldelay[4] = {0, 0, 0, 0};
 
 void Pullcheck_set(uint8_t CHx, int n)
@@ -746,6 +747,7 @@ void motor_motion_run()
             RGB_set(num, 0x00, 0xFF, 0x00);
             pullcheck_count[num] = 0;
             pulldelay[num] = 1;
+            pull_count[num] = 0;
             if (!motor_ready && Host_ONLINE_key_stu == 0) // 等待电机就绪
                 senddelay_count[num] = time_now + 500;
             if (senddelay_count[num] < time_now && MOTOR_CONTROL[num].get_motion() != -3)
@@ -776,18 +778,32 @@ void motor_motion_run()
             break;
         case need_pull_back:
             RGB_set(num, 0xFF, 0x00, 0xFF);
-            if (Host_ONLINE_key_stu > 0)
+            if (pull_count[num] == 0)
+                pull_count[num] = time_now + 30000; // 退料超时时间 30s
+            else if (pullcheck[num] > time_now)
             {
-                MOTOR_CONTROL[num].set_motion(-66, time_pull); // 低压回抽
+                if (Host_ONLINE_key_stu > 0)
+                {
+                    MOTOR_CONTROL[num].set_motion(-66, time_pull); // 低压回抽
+                }
+                else if (Host_ONLINE_key_stu == 0)
+                {
+                    MOTOR_CONTROL[num].set_motion(-2, time_pull);
+                }
             }
-            else if (Host_ONLINE_key_stu == 0)
+            else if (pull_count[num] < time_now + 20000 && MC_ONLINE_key_stu[num] < 2)
             {
-                MOTOR_CONTROL[num].set_motion(-2, time_pull);
-            }
+                Assist_send_filament[num] = true; // 退料过程中检测到离线，尝试进料
+                set_filament_motion(num, idle);
+            }            
+            else if (pull_count[num] < time_now)    // 超时强制置idle
+                set_filament_motion(num, idle);
+            
             Pullcheck_set(num, 2);
             pullcheck_count[num] = time_now + 30000;
             break;
         case on_use:
+            pull_count[num] = 0;
             RGB_set(num, 0xFF, 0xFF, 0xFF);
             if (MOTOR_CONTROL[num].get_motion() == 1)
             {
