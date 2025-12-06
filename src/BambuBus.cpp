@@ -294,13 +294,12 @@ void BambuBus_init()
     {
 
 #ifdef _Bambubus_DEBUG_mode_
-            i.statu = online;
+        i.statu = online;
 #else
-            i.statu = offline;
+        i.statu = offline;
 #endif // DEBUG
 
-            i.motion_set = idle;
-        
+        i.motion_set = idle;
     }
 
     BambuBUS_UART_Init();
@@ -435,7 +434,7 @@ uint8_t get_filament_left_char(uint8_t AMS_num)
         {
             data |= (0x1 << i) << i; // 1<<(2*i)
 
-            if (filament_channel_onpull[i])
+            if (Filament_channel_onpull(i))
             {
                 data |= (0x2 << i) << i; // 2<<(2*i)
             }
@@ -497,6 +496,11 @@ void set_motion_res_datas(unsigned char *set_buf, unsigned char AMS_num, unsigne
 
 bool set_motion(unsigned char AMS_num, unsigned char read_num, unsigned char statu_flags, unsigned char fliment_motion_flag)
 {
+    static uint64_t time_last = 0;
+    static uint64_t idle_count = 0;
+    uint64_t time_now = get_time64();
+    uint64_t time_used = time_now - time_last;
+    time_last = time_now;
     if (BambuBus_address == 0x700) // AMS08
     {
         if (read_num < 4)
@@ -538,6 +542,7 @@ bool set_motion(unsigned char AMS_num, unsigned char read_num, unsigned char sta
                 }
                 data_save.filament[read_num].pressure = 0x2B00;
             }
+            idle_count = 0;
         }
         else if ((read_num == 0xFF))
         {
@@ -545,20 +550,29 @@ bool set_motion(unsigned char AMS_num, unsigned char read_num, unsigned char sta
             {
                 if (data_save.BambuBus_now_filament_num < 4)
                 {
-                    _filament *filament = &(data_save.filament[data_save.BambuBus_now_filament_num]);
-                    if (filament->motion_set == on_use || filament->motion_set == pre_pull)
-                        filament->motion_set = need_pull_back;
-                    filament->pressure = 0x4700;
+                    if (data_save.filament[data_save.BambuBus_now_filament_num].motion_set == idle)
+                    {
+                        if (idle_count > 5000)
+                        {
+                            data_save.filament[data_save.BambuBus_now_filament_num].motion_set = need_pull_back;
+                        }                        
+                    }
+                    else
+                        data_save.filament[data_save.BambuBus_now_filament_num].motion_set = need_pull_back;
+                    data_save.filament[data_save.BambuBus_now_filament_num].pressure = 0x4700;
+                    idle_count = 0;
                 }
             }
             else if ((statu_flags == 0x01) && (fliment_motion_flag == 0x00)) // 01 00(FF)
             {
                 for (auto i = 0; i < 4; i++)
                 {
-                    if (data_save.filament[i].motion_set != on_use)
+                    if (data_save.filament[i].motion_set != on_use || idle_count > 9999)
                         data_save.filament[i].motion_set = idle;
                     data_save.filament[i].pressure = 0xFFFF;
                 }
+                if (idle_count < 10000)
+                    idle_count += time_used;
             }
         }
     }

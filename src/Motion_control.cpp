@@ -30,7 +30,7 @@ float Host_PULL_stu_raw = 0;
 float PULL_voltage_up = 1.80f;   // 状态 压力高 红灯
 float PULL_voltage_down = 1.45f; // 状态 压力低 蓝灯
 // 微动触发控制相关常量
-float MC_PULL_voltage_pull = 1.65f;
+float MC_PULL_voltage_pull = 1.6f;
 bool Assist_send_filament[4] = {false, false, false, false};
 // bool pull_state_old = false; // 上次触发状态——True：未触发，False：进料完成
 // bool is_backing_out = false;
@@ -143,7 +143,7 @@ void MC_PWM_init()
     TIM_Cmd(TIM4, ENABLE);
 }
 
-#define PWM_lim 980
+#define PWM_lim 880
 
 class MOTOR_PID
 {
@@ -555,9 +555,7 @@ void Motion_control_init()
     MC_AS5600.init(AS5600_SCL, AS5600_SDA, 4);
     MC_AS5600.updata_angle();
     Motor_init();
-    if (hub_mode == 1)
-        MC_PULL_voltage_pull = 1.65f;
-    else if (hub_mode == 2)
+    if (hub_mode == 2)
         MC_PULL_voltage_pull = 1.5f;
 }
 
@@ -640,7 +638,10 @@ bool Bmcucheck()
     }
     return false;
 }
-uint8_t lastnum = 0;
+bool Filament_channel_onpull(uint8_t CHx)
+{
+    return filament_channel_onpull[CHx];
+}
 
 void MOTOR_set_time_pull(bool select, uint64_t time1)
 {
@@ -652,6 +653,7 @@ void MOTOR_set_time_pull(bool select, uint64_t time1)
 
 void motor_motion_run()
 {
+    static uint8_t lastnum = 0;
     bool select = Bmcu_select();
     uint8_t num = get_now_filament_num();
     uint64_t time_now = get_time64();
@@ -752,9 +754,6 @@ void motor_motion_run()
                 senddelay_count[num] = time_now + 500;
             if (senddelay_count[num] < time_now && MOTOR_CONTROL[num].get_motion() != -3)
             {
-                // if (sendcheck[num] == 0)
-
-                // if (sendcheck[num] > time_now && ONLINE_key_change[num] == 0)
                 if (MC_PULL_stu[num] <= 1 && Host_ONLINE_key_stu == 0)
                 {
                     MOTOR_CONTROL[num].set_motion(1, 100);
@@ -778,9 +777,7 @@ void motor_motion_run()
             break;
         case need_pull_back:
             RGB_set(num, 0xFF, 0x00, 0xFF);
-            if (pull_count[num] == 0)
-                pull_count[num] = time_now + 30000; // 退料超时时间 30s
-            else if (pullcheck[num] > time_now)
+            if (pull_count[num] > time_now)
             {
                 if (Host_ONLINE_key_stu > 0)
                 {
@@ -797,13 +794,12 @@ void motor_motion_run()
                 set_filament_motion(num, idle);
             }            
             else if (pull_count[num] < time_now)    // 超时强制置idle
-                set_filament_motion(num, idle);
-            
+                set_filament_motion(num, idle);            
             Pullcheck_set(num, 2);
-            pullcheck_count[num] = time_now + 30000;
+            pullcheck_count[num] = time_now + 30000;  // 退料后30s内允许回抽
             break;
         case on_use:
-            pull_count[num] = 0;
+            pull_count[num] = time_now + 30000; // 退料超时时间 30s
             RGB_set(num, 0xFF, 0xFF, 0xFF);
             if (MOTOR_CONTROL[num].get_motion() == 1)
             {
