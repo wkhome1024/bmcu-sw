@@ -688,6 +688,7 @@ void motor_motion_run()
         else if (MOTOR_CONTROL[lastnum].get_motion() < 0 && MC_ONLINE_key_stu[lastnum] < 2)
         {
             MOTOR_CONTROL[lastnum].set_motion(1, 500);
+            MOTOR_CONTROL[lastnum].run(speed_as5600[lastnum]);
             lastnum = num;
         }
         MOTOR_CONTROL[lastnum].run(speed_as5600[lastnum]);
@@ -777,7 +778,9 @@ void motor_motion_run()
             break;
         case need_pull_back:
             RGB_set(num, 0xFF, 0x00, 0xFF);
-            if (pull_count[num] > time_now)
+            if (pull_count[num] == 0)
+                pull_count[num] = time_now + 30000; // 退料超时时间
+            else if (pull_count[num] > time_now)
             {
                 if (Host_ONLINE_key_stu > 0)
                 {
@@ -791,6 +794,7 @@ void motor_motion_run()
             else if (pull_count[num] < time_now + 20000 && MC_ONLINE_key_stu[num] < 2)
             {
                 Assist_send_filament[num] = true; // 退料过程中检测到离线，尝试进料
+                MOTOR_CONTROL[num].set_motion(0, 100);
                 set_filament_motion(num, idle);
             }            
             else if (pull_count[num] < time_now)    // 超时强制置idle
@@ -799,7 +803,7 @@ void motor_motion_run()
             pullcheck_count[num] = time_now + 30000;  // 退料后30s内允许回抽
             break;
         case on_use:
-            pull_count[num] = time_now + 30000; // 退料超时时间 30s
+            pull_count[num] = 0;
             RGB_set(num, 0xFF, 0xFF, 0xFF);
             if (MOTOR_CONTROL[num].get_motion() == 1)
             {
@@ -851,6 +855,7 @@ void motor_motion_run()
             else
             {
                 // MOTOR_CONTROL[num].set_motion(0, 100);
+                pull_count[num] = 0;
                 RGB_set(num, 0x00, 0x00, 0x37);
             }
             break;
