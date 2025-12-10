@@ -96,8 +96,6 @@ void loop()
                 RGB_update();
                 led_time = time_now + 500;
             }
-            if (Motor_need_to_save())
-                Motor_save();
         }
     }
 }

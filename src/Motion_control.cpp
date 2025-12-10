@@ -5,6 +5,9 @@ bool filament_channel_onpull[4] = {false, false, false, false};
 uint8_t Host_ONLINE_key_stu = 0;
 float Host_PULL_stu_raw = 0;
 uint8_t pullcheck[4] = {0, 0, 0, 0}; // 当前bmcu通道使用标记
+uint64_t Assist_send_time = 3000;
+bool Assist_send_filament[4] = {false, false, false, false};
+uint64_t Assist_filament_time[4] = {0, 0, 0, 0};
 void Host_stu_update(uint8_t online_key, uint8_t pull_key)
 {
     static uint8_t online_key_old = 0;
@@ -23,7 +26,8 @@ void Host_stu_update(uint8_t online_key, uint8_t pull_key)
         {
             Host_ONLINE_key_stu = online_key;
         }
-        Host_PULL_stu_raw = (float)((pull_key / 128) + 1.0f); // 0~128 映射 1.0~3.0V
+        float temp_pull = (float)(pull_key);
+        Host_PULL_stu_raw = ((temp_pull / 128) + 1.0f); // 0~128 映射 1.0~3.0V
     }
     else
     {
@@ -39,7 +43,7 @@ struct alignas(4) Motor_save_struct
     uint32_t version = BMCUMotor_version;
     int pwm_zero[4] = {300, 300, 300, 300};
     uint8_t position[4] = {0, 0, 0, 0};
-    uint64_t time_pull = 8000;
+    uint64_t time_pull = 4000;
     uint64_t time_pull_t1 = 4000;
 } motor_save;
 
@@ -189,6 +193,7 @@ public:
         if (time_now >= motor_stop_time)
         {
             motion = 0;
+            filament_channel_onpull[CHx] = false;
         }
         if ((get_filament_online(CHx) == false))
         {
@@ -218,11 +223,13 @@ public:
         }
         else if (motion == -66) // pull on low pressure
         {
-            speed_set = (1.1f - Host_PULL_stu_raw) * 150; // 线性压力反馈  1.1v
-            if (speed_set < 5 && speed_set > 0)           // 防止电机抖动
-                speed_set = 0;
+            
+            speed_set = (1.2f - Host_PULL_stu_raw) * 150; // 线性压力反馈  1.2v
+            if (speed_set > -10)           // 防止电机抖动
+                speed_set = -10;
             else if (speed_set < -80)
-                speed_set = -80;
+                speed_set = -80;            
+            //speed_set = -60;
         }
         else if (motion == -1 || motion == -2) // pull 370 70 130 18
         {
@@ -236,7 +243,8 @@ public:
         {
             speed_set = -20;
         }
-
+        if (motion < 0)
+            filament_channel_onpull[CHx] = true;
         float x = PID.caculate(now_speed - speed_set, (float)(time_now - time_last) / 1000);
         if (x > 5)
             x += pwm_zero;
@@ -474,7 +482,6 @@ void Motor_init()
         motor_save.pwm_zero[1] = 300;
         motor_save.pwm_zero[2] = 300;
         motor_save.pwm_zero[3] = 300;
-        motor_save.time_pull = 500;
         Motor_save();
     }
 
@@ -548,7 +555,6 @@ uint8_t pulldelay[4] = {0, 0, 0, 0};
 void Pullcount_clear(uint8_t CHx)
 {
     pullcheck_count[CHx] = 0;
-
 }
 void Pullcheck_set(uint8_t CHx, int n)
 {
@@ -644,7 +650,54 @@ void motor_motion_run()
         Pullcheck_clear();
         Bmcu_set_no_reset();
     }
-    if (get_filament_online(num))
+    if (Bmcu_select() == false)
+    {
+        for (int i = 0; i < 4; i++)
+        {
+            if (Assist_send_filament[i])
+            { // 允许状态，尝试辅助进料
+                if (Assist_filament_time[i] == 0 && speed_as5600[i] > 0.5) // 初次触发
+                {
+                    Assist_filament_time[i] = time_now + 2000; // 辅助进料间隔2s
+                }
+                else if (Assist_filament_time[i] < time_now)
+                {
+                    //Assist_send_filament[i] = false; // 超时关闭辅助进料
+                    MOTOR_CONTROL[i].set_motion(0, 100); // 停止电机，等待下一次触发
+                    if (speed_as5600[i] < 1)               
+                    {
+                        Assist_filament_time[i] = 0;
+                    }
+                }
+                else if (ONLINE_key_change[i] == 1)                 
+                {                                        
+                    MOTOR_CONTROL[i].set_motion(1, 100); // 驱动送料
+                }
+                else if (ONLINE_key_change[i] == 0)
+                {                                                     // 触发微动，准备停机
+                    MOTOR_CONTROL[i].set_motion(1, Assist_send_time); // 驱动额外送料
+                    Assist_send_filament[i] = false;                  // 达成条件，完成一轮辅助进料。
+                    Assist_filament_time[i] = 0;
+                }
+            }
+            else if (ONLINE_key_change[i] == 1 && ONLINE_key_stu[i] == 0)
+            { // 如果滑块被人为拉动，做出对应响应
+                MOTOR_CONTROL[i].set_motion(-1, 100);
+            }
+        }
+        if (pullcheck_count[num] > time_now)
+        {
+            if (Host_ONLINE_key_stu > 1)
+                MOTOR_CONTROL[num].set_motion(-66, time_pull); // 低压回抽
+            else if (MOTOR_CONTROL[num].get_motion() == -66)
+            {
+                MOTOR_CONTROL[num].set_motion(-2, time_pull);
+                pullcheck_count[num] = 0;
+            }
+            RGB_set(num, 0xFF, 0x00, 0xFF); // 紫灯
+        }
+    }
+    else if (get_filament_online(num))
     {
         switch (get_filament_motion(num))
         {
@@ -714,7 +767,12 @@ void motor_motion_run()
             else if (MOTOR_CONTROL[num].get_motion() != 2 || PULL_key_stu[num] == 0)
             {
                 if (PULL_key_stu[num] == 0)
-                    MOTOR_CONTROL[num].set_motion(100, 100);
+                {
+                    if (Host_PULL_stu_raw < 1.4f)
+                        MOTOR_CONTROL[num].set_motion(100, 200);
+                    else
+                        MOTOR_CONTROL[num].set_motion(100, 100);                    
+                }
                 else if (ONLINE_key_change[num] == 1)
                     MOTOR_CONTROL[num].set_motion(0, 100);
                 pulldelay[num] = 0;
@@ -783,9 +841,10 @@ void Motion_control_run(int error)
         {
             set_filament_online(i, true);
         }
-        else
+        else if (time_now > 3000)
         {
             set_filament_online(i, false);
+            Assist_send_filament[i] = true; // 某通道离线后才可触发辅助进料一次
         }
     }
     if (!Bmcucheck() && time_bmcuset == 0)
