@@ -37,7 +37,7 @@ struct alignas(4) flash_save_struct
 {
     _filament filament[4];
     int BambuBus_now_filament_num = 0;
-    uint8_t bmcu = 1;
+    uint8_t bmcu = 0;
     uint32_t version = Bambubus_version;
     uint32_t check = 0x40614061;
 } data_save;
@@ -488,6 +488,7 @@ void set_motion_res_datas(unsigned char *set_buf, unsigned char AMS_num, unsigne
             flagx = 0x04;
         }
         set_buf[i + 2] = flagx;
+        set_buf[i + 2] |= (GET_pull_state(i) & 0xF0); // pull state
     }
     set_buf[0] = AMS_num;
     set_buf[1] = read_num;

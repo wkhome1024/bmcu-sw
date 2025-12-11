@@ -47,6 +47,12 @@ bool filament_channel_onpull[4] = {false, false, false, false};
  * 通过 ADC 电压值来设定状态
  * 霍尔传感器 MC_PULL_stu_raw , 在线状态 MC_ONLINE_key_stu_raw
  */
+uint8_t GET_pull_state(uint8_t CHx)
+{
+    float temp_pull = (MC_PULL_stu_raw[CHx] - 1.1f) * 15;
+    uint8_t pull_state = (uint8_t)(temp_pull) << 4;
+    return pull_state;
+}
 void Host_stu_update(uint8_t online_key, uint8_t pull_key)
 {
     static uint8_t online_key_old = 0;
