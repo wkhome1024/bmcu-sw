@@ -65,7 +65,8 @@ void Host_stu_update(uint8_t online_key, uint8_t pull_key)
         {
             Host_ONLINE_key_stu = online_key;
         }
-        Host_PULL_stu_raw = (float)((pull_key / 128) + 1.0f); // 0~128 映射 1.0~3.0V
+        float temp_pull = (float)(pull_key);
+        Host_PULL_stu_raw = ((temp_pull / 128) + 1.0f); // 0~128 映射 1.0~3.0V
     }
     else
     {
@@ -269,7 +270,7 @@ public:
         }
         else if (motion == -66) // pull on low pressure
         {
-            speed_set = (1.1f - Host_PULL_stu_raw) * 150; // 线性压力反馈  1.1v
+            speed_set = (1.2f - Host_PULL_stu_raw + 1.2f - MC_PULL_stu_raw[CHx]) * 150; // 线性压力反馈  1.2v
             if (speed_set < 5 && speed_set > 0)           // 防止电机抖动
                 speed_set = 0;
             else if (speed_set < -80)
