@@ -214,7 +214,7 @@ public:
         }
         else if (motion == 2 || motion == 3) // over pressure
         {
-            Motion_control_set_PWM(CHx, -pwm_zero);
+            Motion_control_set_PWM(CHx, pwm_zero);
             return;
         }
         else if (motion == -3) //  pull 进料重试
@@ -656,7 +656,7 @@ void motor_motion_run()
         {
             if (Assist_send_filament[i])
             { // 允许状态，尝试辅助进料
-                if (Assist_filament_time[i] == 0 && speed_as5600[i] > 0.5) // 初次触发
+                if (Assist_filament_time[i] == 0 && speed_as5600[i] > 0.2) // 初次触发
                 {
                     Assist_filament_time[i] = time_now + 2000; // 辅助进料间隔2s
                 }
