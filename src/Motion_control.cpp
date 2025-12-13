@@ -88,7 +88,7 @@ struct alignas(4) Motor_save_struct
     uint8_t version = BMCUMotor_version;
     uint16_t pwm_zero[4] = {380, 380, 380, 380};
     uint8_t position[4] = {0, 0, 0, 0};
-    uint64_t time_pull = 8000;
+    uint64_t time_pull = 4000;
     uint64_t time_pull_t1 = 4000;
 } motor_save;
 
@@ -277,7 +277,7 @@ public:
         else if (motion == -66) // pull on low pressure
         {
             speed_set = (1.2f - Host_PULL_stu_raw + 1.2f - MC_PULL_stu_raw[CHx]) * 150; // 线性压力反馈  1.2v
-            if (speed_set < 5 && speed_set > 0)           // 防止电机抖动
+            if (speed_set < 5 && speed_set > 0)                                         // 防止电机抖动
                 speed_set = 0;
             else if (speed_set < -80)
                 speed_set = -80;
@@ -746,7 +746,7 @@ void motor_motion_run()
                 MOTOR_CONTROL[num].set_motion(-2, time_pull);
                 pullcheck_count[num] = 0;
             }
-            RGB_set(num, 0xFF, 0x00, 0xFF); // 紫灯
+            RGB_set(num, 0xf9, 0xa8, 0x46); // 黄灯
         }
     }
     else if (get_filament_online(num))
@@ -797,17 +797,18 @@ void motor_motion_run()
                 {
                     MOTOR_CONTROL[num].set_motion(-2, time_pull);
                 }
+                Pullcheck_set(num, 2);
+                pullcheck_count[num] = time_now + 30000; // 退料后30s内允许回抽
             }
             else if (pull_count[num] < time_now + 20000 && MC_ONLINE_key_stu[num] < 2)
             {
                 Assist_send_filament[num] = true; // 退料过程中检测到离线，尝试进料
                 MOTOR_CONTROL[num].set_motion(0, 100);
                 set_filament_motion(num, idle);
-            }            
-            else if (pull_count[num] < time_now)    // 超时强制置idle
-                set_filament_motion(num, idle);            
-            Pullcheck_set(num, 2);
-            pullcheck_count[num] = time_now + 30000;  // 退料后30s内允许回抽
+            }
+            else if (pull_count[num] < time_now) // 超时强制置idle
+                set_filament_motion(num, idle);
+
             break;
         case on_use:
             pull_count[num] = 0;
@@ -862,7 +863,7 @@ void motor_motion_run()
             else
             {
                 // MOTOR_CONTROL[num].set_motion(0, 100);
-                pull_count[num] = 0;
+                // pull_count[num] = 0;
                 RGB_set(num, 0x00, 0x00, 0x37);
             }
             break;

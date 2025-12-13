@@ -551,14 +551,7 @@ bool set_motion(unsigned char AMS_num, unsigned char read_num, unsigned char sta
             {
                 if (data_save.BambuBus_now_filament_num < 4)
                 {
-                    if (data_save.filament[data_save.BambuBus_now_filament_num].motion_set == idle)
-                    {
-                        if (idle_count > 5000)
-                        {
-                            data_save.filament[data_save.BambuBus_now_filament_num].motion_set = need_pull_back;
-                        }                        
-                    }
-                    else
+                    if (data_save.filament[data_save.BambuBus_now_filament_num].motion_set != idle)
                         data_save.filament[data_save.BambuBus_now_filament_num].motion_set = need_pull_back;
                     data_save.filament[data_save.BambuBus_now_filament_num].pressure = 0x4700;
                     idle_count = 0;
