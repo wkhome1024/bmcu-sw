@@ -551,21 +551,21 @@ bool set_motion(unsigned char AMS_num, unsigned char read_num, unsigned char sta
             {
                 if (data_save.BambuBus_now_filament_num < 4)
                 {
-                    if (data_save.filament[data_save.BambuBus_now_filament_num].motion_set != idle)
-                        data_save.filament[data_save.BambuBus_now_filament_num].motion_set = need_pull_back;
-                    data_save.filament[data_save.BambuBus_now_filament_num].pressure = 0x4700;
-                    idle_count = 0;
+                    _filament *filament = &(data_save.filament[data_save.BambuBus_now_filament_num]);
+                    if (filament->motion_set == on_use || filament->motion_set == pre_pull)
+                        filament->motion_set = need_pull_back;
+                    filament->pressure = 0x4700;
                 }
             }
             else if ((statu_flags == 0x01) && (fliment_motion_flag == 0x00)) // 01 00(FF)
             {
                 for (auto i = 0; i < 4; i++)
                 {
-                    if (data_save.filament[i].motion_set != on_use || idle_count > 9999)
+                    if (data_save.filament[i].motion_set != on_use || idle_count > 59999)
                         data_save.filament[i].motion_set = idle;
                     data_save.filament[i].pressure = 0xFFFF;
                 }
-                if (idle_count < 10000)
+                if (idle_count < 60000)
                     idle_count += time_used;
             }
         }

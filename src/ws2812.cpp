@@ -32,7 +32,7 @@ void WS2812_class::clear(void)
 void WS2812_class::RST(void)
 {
     RGB_L();
-    delayMicroseconds(50);
+    delayMicroseconds(100);
 }
 
 void WS2812_class::updata()
@@ -52,7 +52,8 @@ void WS2812_class::updata()
             __NOP();__NOP();__NOP();__NOP();__NOP();__NOP();__NOP();__NOP();__NOP();__NOP();
             __NOP();__NOP();__NOP();__NOP();__NOP();__NOP();__NOP();__NOP();__NOP();__NOP();
             __NOP();__NOP();__NOP();__NOP();__NOP();__NOP();__NOP();__NOP();__NOP();__NOP();
-            __NOP();__NOP();__NOP();__NOP();__NOP();__NOP();__NOP();__NOP();__NOP();__NOP();//@144Mhz
+            __NOP();__NOP();__NOP();__NOP();__NOP();__NOP();
+            //@144Mhz
         }
     }
     RST();
@@ -60,10 +61,8 @@ void WS2812_class::updata()
 void WS2812_class::set_RGB(unsigned char R, unsigned char G, unsigned char B, unsigned char index)
 {
     uint32_t DATA = 0;
+    index=index*3;
     int i;
-    index = index * 3;
-    if (index >= num * 3)
-        return;
     for (i = 0; i < 8; i++)
     {
         DATA <<= 3;

@@ -258,17 +258,13 @@ public:
         }
         else if (motion == 1) // send 370 40  130 15
         {
-            speed_set = 40;
+            speed_set = 40 + (2.1f - MC_PULL_stu_raw[CHx]) * 20;
         }
-        else if (motion == 3) // send on high pressure
+        else if (motion == 2 ||motion == 3) // send on high pressure
         {
             speed_set = (2.0f - MC_PULL_stu_raw[CHx]) * 100; // 高压力反馈
             if (speed_set < 0 && speed_set > -5)             // 防止电机抖动
                 speed_set = 0;
-        }
-        else if (motion == 2) // over pressure
-        {
-            speed_set = 5;
         }
         else if (motion == -3) //  pull 进料重试
         {
@@ -830,10 +826,6 @@ void motor_motion_run()
                 else
                     MOTOR_CONTROL[num].set_motion(66, 100);
                 pulldelay[num] = 0;
-            }
-            if (MOTOR_CONTROL[num].get_motion() == 2 && MC_PULL_stu[num] == 2)
-            {
-                MOTOR_CONTROL[num].set_motion(99, 100); // 保持压力 确保送入挤出轮
             }
             break;
         case pre_pull:
