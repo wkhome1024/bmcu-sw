@@ -107,6 +107,10 @@ void MC_PWM_init()
 
 uint8_t PULL_key_stu[4] = {0, 0, 0, 0};
 uint8_t PULL_key_change[4] = {0, 0, 0, 0};
+uint8_t ONLINE_key_stu[4] = {0, 0, 0, 0};
+uint64_t ONLINE_key_stu_count[4] = {0, 0, 0, 0};
+uint8_t ONLINE_key_change[4] = {0, 0, 0, 0};
+uint64_t ONLINE_key_change_count[4] = {0, 0, 0, 0};
 #define PWM_lim 820
 
 class MOTOR_PID
@@ -223,13 +227,13 @@ public:
         }
         else if (motion == -66) // pull on low pressure
         {
-            
-            speed_set = (1.2f - Host_PULL_stu_raw) * 150; // 线性压力反馈  1.2v
-            if (speed_set > -10)           // 防止电机抖动
+
+            speed_set = -40 + (1.2f - Host_PULL_stu_raw) * 100; // 线性压力反馈  1.2v
+            if (speed_set > -10)                                // 防止电机抖动
                 speed_set = -10;
-            else if (speed_set < -80)
-                speed_set = -80;            
-            //speed_set = -60;
+            else if (speed_set < -80 || ONLINE_key_change[CHx] == 1)
+                speed_set = -80;
+            // speed_set = -60;
         }
         else if (motion == -1 || motion == -2) // pull 370 70 130 18
         {
@@ -290,10 +294,6 @@ void MC_PULL_key_init()
     MC_PULL_key_read();
 }
 
-uint8_t ONLINE_key_stu[4] = {0, 0, 0, 0};
-uint64_t ONLINE_key_stu_count[4] = {0, 0, 0, 0};
-uint8_t ONLINE_key_change[4] = {0, 0, 0, 0};
-uint64_t ONLINE_key_change_count[4] = {0, 0, 0, 0};
 void MC_ONLINE_key_read(void)
 {
     uint8_t stu_read[4];
@@ -330,6 +330,10 @@ void MC_ONLINE_key_read(void)
             ONLINE_key_change[i] = stu_read[i];
         }
     }
+}
+void MC_ONLINE_reset(uint8_t CHx)
+{
+    ONLINE_key_stu[CHx] = 0;
 }
 void MC_ONLINE_key_init()
 {
@@ -655,22 +659,23 @@ void motor_motion_run()
         for (int i = 0; i < 4; i++)
         {
             if (Assist_send_filament[i])
-            { // 允许状态，尝试辅助进料
+            {                                                              // 允许状态，尝试辅助进料
                 if (Assist_filament_time[i] == 0 && speed_as5600[i] > 0.2) // 初次触发
                 {
                     Assist_filament_time[i] = time_now + 2000; // 辅助进料间隔2s
                 }
                 else if (Assist_filament_time[i] < time_now)
                 {
-                    //Assist_send_filament[i] = false; // 超时关闭辅助进料
+                    if (ONLINE_key_change[i] == 0)
+                        Assist_send_filament[i] = false; // 超时关闭辅助进料
                     MOTOR_CONTROL[i].set_motion(0, 100); // 停止电机，等待下一次触发
-                    if (speed_as5600[i] < 1)               
+                    if (speed_as5600[i] < 1)
                     {
                         Assist_filament_time[i] = 0;
                     }
                 }
-                else if (ONLINE_key_change[i] == 1)                 
-                {                                        
+                else if (ONLINE_key_change[i] == 1)
+                {
                     MOTOR_CONTROL[i].set_motion(1, 100); // 驱动送料
                 }
                 else if (ONLINE_key_change[i] == 0)
@@ -687,14 +692,18 @@ void motor_motion_run()
         }
         if (pullcheck_count[num] > time_now)
         {
-            if (Host_ONLINE_key_stu > 1)
+            if (Host_ONLINE_key_stu > 0 && MOTOR_CONTROL[num].get_motion() < 0)
                 MOTOR_CONTROL[num].set_motion(-66, time_pull); // 低压回抽
-            else if (MOTOR_CONTROL[num].get_motion() == -66)
+            else
             {
                 MOTOR_CONTROL[num].set_motion(-2, time_pull);
                 pullcheck_count[num] = 0;
             }
             RGB_set(num, 0xFF, 0x00, 0xFF); // 紫灯
+        }
+        else
+        {
+            RGB_set(num, 0x00, 0x00, 0x37); // 蓝灯
         }
     }
     else if (get_filament_online(num))
@@ -745,13 +754,13 @@ void motor_motion_run()
                 }
                 else if (Host_ONLINE_key_stu == 0)
                 {
-                    MOTOR_CONTROL[num].set_motion(-2, time_pull);
+                    MOTOR_CONTROL[num].set_motion(-1, time_pull);
                 }
             }
             else if (pull_count[num] < time_now) // 超时强制置idle
                 set_filament_motion(num, idle);
             Pullcheck_set(num, 2);
-            pullcheck_count[num] = time_now + 30000; // 退料后30s内允许回抽
+            pullcheck_count[num] = time_now + 10000; // 退料后10s内允许回抽
             break;
         case on_use:
             pull_count[num] = 0;
@@ -762,7 +771,7 @@ void motor_motion_run()
             }
             else if (MOTOR_CONTROL[num].get_motion() == 99 || MOTOR_CONTROL[num].get_motion() == 3)
             {
-                MOTOR_CONTROL[num].set_motion(2, 5000); // 保持压力延迟5s
+                MOTOR_CONTROL[num].set_motion(2, 2000); // 保持压力延迟2s
             }
             else if (MOTOR_CONTROL[num].get_motion() != 2 || PULL_key_stu[num] == 0)
             {
@@ -771,7 +780,7 @@ void motor_motion_run()
                     if (Host_PULL_stu_raw < 1.4f)
                         MOTOR_CONTROL[num].set_motion(100, 200);
                     else
-                        MOTOR_CONTROL[num].set_motion(100, 100);                    
+                        MOTOR_CONTROL[num].set_motion(100, 100);
                 }
                 else if (ONLINE_key_change[num] == 1)
                     MOTOR_CONTROL[num].set_motion(0, 100);
@@ -788,14 +797,14 @@ void motor_motion_run()
             if (PULL_key_stu[num] == 0)
                 MOTOR_CONTROL[num].set_motion(0, 100);
             else
-                MOTOR_CONTROL[num].set_motion(-66, 100);
+                MOTOR_CONTROL[num].set_motion(-100, 100);
             break;
         case idle:
             if (pullcheck_count[num] > time_now)
             {
-                if (Host_ONLINE_key_stu > 1)
+                if (Host_ONLINE_key_stu > 0 && MOTOR_CONTROL[num].get_motion() < 0)
                     MOTOR_CONTROL[num].set_motion(-66, time_pull); // 低压回抽
-                else if (MOTOR_CONTROL[num].get_motion() == -66)
+                else
                 {
                     MOTOR_CONTROL[num].set_motion(-2, time_pull);
                     pullcheck_count[num] = 0;
@@ -805,8 +814,8 @@ void motor_motion_run()
             else
             {
                 // MOTOR_CONTROL[num].set_motion(0, 100);
-                pull_count[num] = 0;
-                RGB_set(num, 0x00, 0x00, 0x37);
+                // pull_count[num] = 0;
+                RGB_set(num, 0x00, 0x00, 0x37); // 蓝灯
             }
             break;
         }

@@ -12,5 +12,5 @@ extern void MOTOR_set_pwm_zero(int pwm);
 extern void Motor_set_need_to_save();
 extern void Motor_save();
 extern bool Motor_need_to_save();
-extern void MOTOR_get_pwm_zero();
+extern void MC_ONLINE_reset(uint8_t CHx);
 extern bool Filament_channel_onpull(uint8_t CHx);

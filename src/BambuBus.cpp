@@ -37,7 +37,7 @@ struct alignas(4) flash_save_struct
 {
     _filament filament[4];
     int BambuBus_now_filament_num = 0;
-    uint8_t bmcu = 0;
+    uint8_t bmcu = 1;
     uint32_t version = Bambubus_version;
     uint32_t check = 0x40614061;
 } data_save;
@@ -1059,7 +1059,10 @@ void send_for_Set_filament(unsigned char *buf, int length)
         if (command_2 == 0xD1) // 白色  --重置指定通道里程
             reset_filament_meters(read_num);
         else if (command_2 == 0xD9) // 黑色  --指定通道onuse
+        {
             set_filament_motion(read_num, on_use);
+            MC_ONLINE_reset(read_num);
+        }
         else if (command_2 == 0xD3 && read_num == 0) // 棕色  --电机退料时间设定 二段
             MOTOR_set_time_pull(true, 100);
         else if (command_2 == 0xD3 && read_num == 1) // 棕色  --电机退料时间设定
