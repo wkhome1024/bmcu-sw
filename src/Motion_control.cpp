@@ -660,7 +660,7 @@ void motor_motion_run()
         {
             if (Assist_send_filament[i])
             {                                                              // 允许状态，尝试辅助进料
-                if (Assist_filament_time[i] == 0 && speed_as5600[i] > 0.2) // 初次触发
+                if (Assist_filament_time[i] == 0 && abs(speed_as5600[i]) > 0.2) // 初次触发
                 {
                     Assist_filament_time[i] = time_now + 2000; // 辅助进料间隔2s
                 }
@@ -676,7 +676,7 @@ void motor_motion_run()
                 }
                 else if (ONLINE_key_change[i] == 1)
                 {
-                    MOTOR_CONTROL[i].set_motion(1, 100); // 驱动送料
+                    MOTOR_CONTROL[i].set_motion(1, Assist_send_time); // 驱动送料
                 }
                 else if (ONLINE_key_change[i] == 0)
                 {                                                     // 触发微动，准备停机
@@ -688,6 +688,7 @@ void motor_motion_run()
             else if (ONLINE_key_change[i] == 1 && ONLINE_key_stu[i] == 0)
             { // 如果滑块被人为拉动，做出对应响应
                 MOTOR_CONTROL[i].set_motion(-1, 100);
+                ONLINE_key_stu[i] = 0;               // 手动拉动时，屏蔽在线信号
             }
         }
         if (pullcheck_count[num] > time_now)

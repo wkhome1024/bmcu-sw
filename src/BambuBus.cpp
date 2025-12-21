@@ -498,6 +498,7 @@ bool set_motion(unsigned char AMS_num, unsigned char read_num, unsigned char sta
 {
     static uint64_t time_last = 0;
     static uint64_t idle_count = 0;
+    static uint64_t pre_pull_count = 0;
     uint64_t time_now = get_time64();
     uint64_t time_used = time_now - time_last;
     time_last = time_now;
@@ -519,6 +520,7 @@ bool set_motion(unsigned char AMS_num, unsigned char read_num, unsigned char sta
                 }
                 data_save.filament[read_num].motion_set = need_send_out;
                 data_save.filament[read_num].pressure = 0x4700;
+                pre_pull_count = 0;
             }
             else if ((statu_flags == 0x09)) // 09 A5 / 09 3F
             {
@@ -526,7 +528,7 @@ bool set_motion(unsigned char AMS_num, unsigned char read_num, unsigned char sta
                 {
                     data_save.filament[read_num].motion_set = on_use;
                 }
-
+                pre_pull_count = 0;
                 data_save.filament[read_num].pressure = 0x2B00;
             }
             else if ((statu_flags == 0x07) && (fliment_motion_flag == 0x7F)) // 07 7F
@@ -536,9 +538,17 @@ bool set_motion(unsigned char AMS_num, unsigned char read_num, unsigned char sta
             }
             else if ((statu_flags == 0x07) && (fliment_motion_flag == 0x00)) // 07 00
             {
-                if (data_save.filament[read_num].motion_set == on_use)
+                if (pre_pull_count < 10000 && pre_pull_count > 1000) // 10s pre pull
                 {
-                    data_save.filament[read_num].motion_set = pre_pull;
+                    if (data_save.filament[AMS_num][read_num].motion_set == on_use)
+                    {
+                        data_save.filament[AMS_num][read_num].motion_set = pre_pull;
+                    }
+                    pre_pull_count += time_used;
+                }
+                else
+                {
+                    data_save.filament[AMS_num][read_num].motion_set = on_use;
                 }
                 data_save.filament[read_num].pressure = 0x2B00;
             }
@@ -550,28 +560,21 @@ bool set_motion(unsigned char AMS_num, unsigned char read_num, unsigned char sta
             {
                 if (data_save.BambuBus_now_filament_num < 4)
                 {
-                    if (data_save.filament[data_save.BambuBus_now_filament_num].motion_set == idle)
-                    {
-                        if (idle_count > 5000)
-                        {
-                            data_save.filament[data_save.BambuBus_now_filament_num].motion_set = need_pull_back;
-                        }                        
-                    }
-                    else
-                        data_save.filament[data_save.BambuBus_now_filament_num].motion_set = need_pull_back;
-                    data_save.filament[data_save.BambuBus_now_filament_num].pressure = 0x4700;
-                    idle_count = 0;
+                    _filament *filament = &(data_save.filament[data_save.BambuBus_now_filament_num]);
+                    if (filament->motion_set == on_use || filament->motion_set == pre_pull)
+                        filament->motion_set = need_pull_back;
+                    filament->pressure = 0x4700;
                 }
             }
             else if ((statu_flags == 0x01) && (fliment_motion_flag == 0x00)) // 01 00(FF)
             {
                 for (auto i = 0; i < 4; i++)
                 {
-                    if (data_save.filament[i].motion_set != on_use || idle_count > 9999)
+                    if (data_save.filament[i].motion_set != on_use || idle_count > 59999)
                         data_save.filament[i].motion_set = idle;
                     data_save.filament[i].pressure = 0xFFFF;
                 }
-                if (idle_count < 10000)
+                if (idle_count < 60000)
                     idle_count += time_used;
             }
         }
