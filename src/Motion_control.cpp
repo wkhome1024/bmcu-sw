@@ -81,14 +81,14 @@ void Host_stu_update(uint8_t online_key, uint8_t pull_key)
     }
 }
 
-#define BMCUMotor_version 6
+#define BMCUMotor_version 7
 #define use_flash_addr ((uint32_t)0x0800FA00)
 struct alignas(4) Motor_save_struct
 {
     uint8_t version = BMCUMotor_version;
     uint16_t pwm_zero[4] = {380, 380, 380, 380};
     uint8_t position[4] = {0, 0, 0, 0};
-    uint64_t time_pull = 4000;
+    uint64_t time_pull = 6000;
     uint64_t time_pull_t1 = 4000;
 } motor_save;
 
@@ -260,7 +260,7 @@ public:
         {
             speed_set = 40 + (2.1f - MC_PULL_stu_raw[CHx]) * 20;
         }
-        else if (motion == 2 ||motion == 3) // send on high pressure
+        else if (motion == 2 || motion == 3) // send on high pressure
         {
             speed_set = (2.0f - MC_PULL_stu_raw[CHx]) * 100; // 高压力反馈
             if (speed_set < 0 && speed_set > -5)             // 防止电机抖动
@@ -735,14 +735,18 @@ void motor_motion_run()
         }
         if (pullcheck_count[num] > time_now)
         {
-            if (Host_ONLINE_key_stu > 1)
+            if (Host_ONLINE_key_stu > 0 && MOTOR_CONTROL[num].get_motion() < 0)
                 MOTOR_CONTROL[num].set_motion(-66, time_pull); // 低压回抽
-            else if (MOTOR_CONTROL[num].get_motion() == -66)
+            else
             {
                 MOTOR_CONTROL[num].set_motion(-2, time_pull);
                 pullcheck_count[num] = 0;
             }
             RGB_set(num, 0xf9, 0xa8, 0x46); // 黄灯
+        }
+        else
+        {
+            RGB_set(num, 0x00, 0x00, 0x37); // 蓝灯
         }
     }
     else if (get_filament_online(num))
@@ -843,20 +847,18 @@ void motor_motion_run()
         case idle:
             if (pullcheck_count[num] > time_now)
             {
-                if (Host_ONLINE_key_stu > 1)
+                if (Host_ONLINE_key_stu > 0 && MOTOR_CONTROL[num].get_motion() < 0)
                     MOTOR_CONTROL[num].set_motion(-66, time_pull); // 低压回抽
-                else if (MOTOR_CONTROL[num].get_motion() == -66)
+                else
                 {
                     MOTOR_CONTROL[num].set_motion(-2, time_pull);
                     pullcheck_count[num] = 0;
                 }
-                RGB_set(num, 0xFF, 0x00, 0xFF); // 紫灯
+                RGB_set(num, 0xf9, 0xa8, 0x46); // 黄灯
             }
             else
             {
-                // MOTOR_CONTROL[num].set_motion(0, 100);
-                // pull_count[num] = 0;
-                RGB_set(num, 0x00, 0x00, 0x37);
+                RGB_set(num, 0x00, 0x00, 0x37); // 蓝灯
             }
             break;
         }
