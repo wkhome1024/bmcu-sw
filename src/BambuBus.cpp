@@ -541,15 +541,15 @@ bool set_motion(unsigned char AMS_num, unsigned char read_num, unsigned char sta
             {
                 if (pre_pull_count < 10000 && pre_pull_count > 1000) // 10s pre pull
                 {
-                    if (data_save.filament[AMS_num][read_num].motion_set == on_use)
+                    if (data_save.filament[read_num].motion_set == on_use)
                     {
-                        data_save.filament[AMS_num][read_num].motion_set = pre_pull;
+                        data_save.filament[read_num].motion_set = pre_pull;
                     }
                     pre_pull_count += time_used;
                 }
                 else
                 {
-                    data_save.filament[AMS_num][read_num].motion_set = on_use;
+                    data_save.filament[read_num].motion_set = on_use;
                 }
                 data_save.filament[read_num].pressure = 0x2B00;
             }
