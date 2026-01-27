@@ -305,14 +305,18 @@ public:
             x = PWM_lim;
         if (x < -PWM_lim)
             x = -PWM_lim;
-        if (now_speed > 0.2 || motion == 0 || now_speed < -0.2 || time_set_speed < time_now - 10000)
+        if (now_speed > 0.2 || motion == 0 || now_speed < -0.2)
         {
             time_set_speed = time_now + 3000;
         }
         if (time_set_speed < time_now && time_set_speed != 0)
         {
             if (x > 800 || x < -800)
+            {
                 x = 0; // 防止电机卡死过热
+                if (time_set_speed < time_now - 5000)
+                    PID.clear();                
+            }
         }
         Motion_control_set_PWM(CHx, -x);
         time_last = time_now;

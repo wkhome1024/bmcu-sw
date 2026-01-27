@@ -1062,8 +1062,16 @@ void send_for_Set_filament(unsigned char *buf, int length)
     {
         if (command_2 == 0xD1) // 白色  --重置指定通道里程
             reset_filament_meters(read_num);
-        else if (command_2 == 0xD9) // 黑色  --指定通道onuse
+        else if (command_2 == 0xB9)   //--指定通道need_pull_back
+            set_filament_motion(read_num, need_pull_back);
+        else if (command_2 == 0xC9)   //--指定通道need_send_out
+            set_filament_motion(read_num, need_send_out);
+        else if (command_2 == 0xD9)   //--指定通道onuse
             set_filament_motion(read_num, on_use);
+        else if (command_2 == 0xE9)   //--指定通道idle
+            set_filament_motion(read_num, idle); 
+        else if (command_2 == 0xF9)   //--指定通道pre_pull
+            set_filament_motion(read_num, pre_pull);   
         else if (command_2 == 0xD3 && read_num == 0) // 棕色  --电机退料时间设定 二段
             MOTOR_set_time_pull(true, 100);
         else if (command_2 == 0xD3 && read_num == 1) // 棕色  --电机退料时间设定
