@@ -69,10 +69,9 @@ void loop()
     while (1)
     {
         package_type stu = BambuBus_run();
-
+        uint64_t time_now = get_time64();
         if (stu != BambuBus_package_NONE) // have data/offline
         {
-            uint64_t time_now = get_time64();
             if (stu == BambuBus_package_ERROR) // offline
             {
                 if (error_time < time_now - 1000)
@@ -82,7 +81,7 @@ void loop()
                 else if (time_now > error_time && error_time > time_now - 1000)
                 {
                     error_time = 0;
-                    error = -1;                    
+                    //error = -1;                    
                 }
                 SYS_RGB.set_RGB(0x30, 0x00, 0x00, 0);
                 // RGB_update();
@@ -102,15 +101,15 @@ void loop()
             if (motion_run < time_now)
             {
                 Motion_control_run(error);
-                motion_run = time_now + 10;
+                motion_run = time_now + 30;
             }
             if (led_time < time_now)
             {
                 RGB_update();
                 led_time = time_now + 500;
             }
-
         }
+        
         delay(1);
     }
 }

@@ -543,7 +543,7 @@ bool set_motion(unsigned char AMS_num, unsigned char read_num, unsigned char sta
                 {
                     if (data_save.filament[read_num].motion_set == on_use)
                     {
-                        data_save.filament[read_num].motion_set = pre_pull;
+                        //data_save.filament[read_num].motion_set = pre_pull;
                     }
                     pre_pull_count += time_used;
                 }

@@ -30,7 +30,7 @@ float Host_PULL_stu_raw = 0;
 float PULL_voltage_up = 1.80f;   // 状态 压力高 红灯
 float PULL_voltage_down = 1.45f; // 状态 压力低 蓝灯
 // 微动触发控制相关常量
-float MC_PULL_voltage_pull = 1.6f;
+float MC_PULL_voltage_pull = 1.65f;
 bool Assist_send_filament[4] = {false, false, false, false};
 // bool pull_state_old = false; // 上次触发状态——True：未触发，False：进料完成
 // bool is_backing_out = false;
@@ -829,8 +829,8 @@ void motor_motion_run()
             {
                 if (MC_PULL_stu[num] == -2)
                     MOTOR_CONTROL[num].set_motion(100, 100);
-                else if (MC_PULL_stu[num] > 0)
-                    MOTOR_CONTROL[num].set_motion(0, 100);
+                else if (MC_PULL_stu[num] == 2)
+                    MOTOR_CONTROL[num].set_motion(-2, 100);
                 else
                     MOTOR_CONTROL[num].set_motion(66, 100);
                 pulldelay[num] = 0;
