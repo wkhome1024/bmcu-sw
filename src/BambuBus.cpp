@@ -104,6 +104,7 @@ bool get_filament_online(int num)
 void set_filament_motion(int num, _filament_motion_state_set motion)
 {
     data_save.filament[num].motion_set = motion;
+    data_save.BambuBus_now_filament_num = num;
 }
 
 void set_now_filament_num(int num)

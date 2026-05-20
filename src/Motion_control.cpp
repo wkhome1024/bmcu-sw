@@ -9,7 +9,7 @@ uint32_t AS5600_SDA[] = {PD0, PC15, PC14, PC13};
 // uint32_t AS5600_SCL[] = {PA6, PA4, PA2, PA0};
 // uint32_t AS5600_SDA[] = {PA7, PA5, PA3, PA1};
 #define AS5600_PI 3.1415926535897932384626433832795
-#define speed_filter_k 10
+#define speed_filter_k 50
 float speed_as5600[4] = {0, 0, 0, 0};
 uint8_t pullcheck[4] = {0, 0, 0, 0}; // 当前bmcu通道使用标记
 /******************************     初始化 ADC       *******************************/
@@ -830,8 +830,8 @@ void motor_motion_run()
                 if (MC_PULL_stu[num] == -2)
                     MOTOR_CONTROL[num].set_motion(100, 100);
                 else if (MC_PULL_stu[num] == 2)
-                    MOTOR_CONTROL[num].set_motion(-2, 100);
-                else
+                    MOTOR_CONTROL[num].set_motion(-3, 100);
+                else if (MC_PULL_stu[num] < 1)
                     MOTOR_CONTROL[num].set_motion(66, 100);
                 pulldelay[num] = 0;
             }
