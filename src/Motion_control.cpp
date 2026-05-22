@@ -88,8 +88,8 @@ struct alignas(4) Motor_save_struct
     uint8_t version = BMCUMotor_version;
     uint16_t pwm_zero[4] = {380, 380, 380, 380};
     uint8_t position[4] = {0, 0, 0, 0};
-    uint64_t time_pull = 6000;
-    uint64_t time_pull_t1 = 4000;
+    uint64_t time_pull = 4000;
+    uint64_t time_pull_t1 = 2000;
 } motor_save;
 
 void MC_PWM_init()
@@ -272,7 +272,7 @@ public:
         }
         else if (motion == -66) // pull on low pressure
         {
-            speed_set = (1.2f - Host_PULL_stu_raw + 1.2f - MC_PULL_stu_raw[CHx]) * 150; // 线性压力反馈  1.2v
+            speed_set = (1.0f - MC_PULL_stu_raw[CHx]) * 100; // 线性压力反馈  1.0v
             if (speed_set < 5 && speed_set > 0)                                         // 防止电机抖动
                 speed_set = 0;
             else if (speed_set < -80)
@@ -515,10 +515,12 @@ void Motor_set_need_to_save()
 }
 void Motor_save()
 {
+    /*
     for (int index = 0; index < 4; index++)
     {
         motor_save.position[index] = pullcheck[index];
     }
+    */
     Flash_saves(&motor_save, sizeof(motor_save), use_flash_addr);
     motor_need_to_save = false;
 }
@@ -541,9 +543,9 @@ void Motor_init()
 
     for (int index = 0; index < 4; index++)
     {
-        pullcheck[index] = motor_save.position[index];
-        if (pullcheck[index] == 2)
-            set_now_filament_num(index);
+        //pullcheck[index] = motor_save.position[index];
+        //if (pullcheck[index] == 2)
+        //    set_now_filament_num(index);
         Motion_control_set_PWM(index, 0);
         MOTOR_CONTROL[index].set_pwm_zero(motor_save.pwm_zero[index]);
     }

@@ -1076,19 +1076,19 @@ void send_for_Set_filament(unsigned char *buf, int length)
         else if (command_2 == 0xD3 && read_num == 0) // 棕色  --电机退料时间设定 二段
             MOTOR_set_time_pull(true, 100);
         else if (command_2 == 0xD3 && read_num == 1) // 棕色  --电机退料时间设定
-            MOTOR_set_time_pull(true, 4000);
+            MOTOR_set_time_pull(true, 2000);
         else if (command_2 == 0xD3 && read_num == 2) // 棕色  --电机退料时间设定 --默认 8s
-            MOTOR_set_time_pull(true, 8000);
+            MOTOR_set_time_pull(true, 4000);
         else if (command_2 == 0xD3 && read_num == 3) // 棕色  --电机退料时间设定
-            MOTOR_set_time_pull(true, 12000);
+            MOTOR_set_time_pull(true, 8000);
         else if (command_2 == 0xD5 && read_num == 0) // 岩石灰  --电机退料时间设定  一段
             MOTOR_set_time_pull(false, 1000);
         else if (command_2 == 0xD5 && read_num == 1) // 岩石灰  --电机退料时间设定
-            MOTOR_set_time_pull(false, 4000);
+            MOTOR_set_time_pull(false, 2000);
         else if (command_2 == 0xD5 && read_num == 2) // 岩石灰  --电机退料时间设定 --默认 8s
-            MOTOR_set_time_pull(false, 8000);
+            MOTOR_set_time_pull(false, 4000);
         else if (command_2 == 0xD5 && read_num == 3) // 岩石灰  --电机退料时间设定
-            MOTOR_set_time_pull(false, 12000);
+            MOTOR_set_time_pull(false, 8000);
         else if (command_2 == 0xD7 && read_num == 0) ////灰色  --电机pwm 设定
             MOTOR_set_pwm_zero(220);
         else if (command_2 == 0xD7 && read_num == 1) ////灰色  --电机pwm 设定
