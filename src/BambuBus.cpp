@@ -424,7 +424,6 @@ package_type get_packge_type(unsigned char *buf, int length)
     }
     return BambuBus_package_NONE;
 }
-uint8_t package_num = 0;
 
 uint8_t get_filament_left_char(uint8_t AMS_num)
 {
@@ -544,7 +543,7 @@ bool set_motion(unsigned char AMS_num, unsigned char read_num, unsigned char sta
                 {
                     if (data_save.filament[read_num].motion_set == on_use)
                     {
-                        //data_save.filament[read_num].motion_set = pre_pull;
+                        // data_save.filament[read_num].motion_set = pre_pull;
                     }
                     pre_pull_count += time_used;
                 }
@@ -600,7 +599,7 @@ void send_for_Hit(unsigned char *buf, int length)
     Hit_res[0] = 0x7D;
     unsigned char AMS_num = buf[3];
     unsigned char read_num = buf[4];
-    package_num = 0;
+    /*
     if ((buf[5] &= 0x30) && BambuBus_address == 0)
     {
         BambuBus_address = 0x700;
@@ -608,10 +607,10 @@ void send_for_Hit(unsigned char *buf, int length)
     else if ((buf[5] &= 0xC0) && BambuBus_address == 0)
     {
         BambuBus_address = 0x1200;
-    }
+    }    
+    */
     if (data_save.bmcu != AMS_num)
         return;
-
     set_motion_res_datas(Hit_res + 2, AMS_num, read_num, 0);
     package_send_with_crc(Hit_res, sizeof(Hit_res));
 }
@@ -668,11 +667,16 @@ void send_for_Cxx(unsigned char *buf, int length)
     {
         if (read_num != 0xFF)
         {
-            Bmcu_select_flag = false;
-            for (int i = 0; i < 4; i++)
+            if (statu_flags == 0x07 || statu_flags == 0x03)
             {
-                if (data_save.filament[i].motion_set == need_pull_back)
-                    set_filament_motion(i, idle);
+                Bmcu_select_flag = false;
+                /*
+                for (int i = 0; i < 4; i++)
+                {
+                    if (data_save.filament[i].motion_set == need_pull_back)
+                        set_filament_motion(i, idle);
+                }
+                */
             }
         }
         return;
@@ -682,12 +686,12 @@ void send_for_Cxx(unsigned char *buf, int length)
         if (read_num < 4 && !Bmcu_select_flag)
         {
             Bmcu_select_flag = true;
-            Bmcu_selest_count = 0;
+            // Bmcu_selest_count = 0;
         }
-        else if (read_num == 0xFF && statu_flags == 0x01 && Bmcu_select_flag)
+        else if (read_num == 0xFF && statu_flags == 0x01)
         {
             Bmcu_select_flag = false;
-            // Bmcu_selest_count = get_time64() + 15000;
+            // Bmcu_selest_count = get_time64() + 2000;
         }
     }
 
@@ -697,10 +701,6 @@ void send_for_Cxx(unsigned char *buf, int length)
     set_motion_res_datas(Cxx_res + 2, AMS_num, read_num, statu_flags);
     package_send_with_crc(Cxx_res, sizeof(Cxx_res));
 
-    if (package_num < 20)
-        package_num++;
-    else
-        package_num = 0;
 }
 /*
 0x00, 0x00, 0x00, 0xFF, // 0x0C...
@@ -755,11 +755,13 @@ void send_for_Dxx(unsigned char *buf, int length)
         if (read_num != 0xFF)
         {
             Bmcu_select_flag = false;
+            /*
             for (int i = 0; i < 4; i++)
             {
                 if (data_save.filament[i].motion_set == need_pull_back)
                     set_filament_motion(i, idle);
             }
+            */
         }
         return;
     }
@@ -768,7 +770,7 @@ void send_for_Dxx(unsigned char *buf, int length)
         if (read_num < 4 && !Bmcu_select_flag)
         {
             Bmcu_select_flag = true;
-            Bmcu_selest_count = 0;
+            // Bmcu_selest_count = 0;
         }
         else if (read_num == 0xFF && statu_flags == 0x01 && Bmcu_select_flag)
         {
@@ -796,10 +798,6 @@ void send_for_Dxx(unsigned char *buf, int length)
 
     set_motion_res_datas(Dxx_res + 2, AMS_num, read_num, statu_flags);
     package_send_with_crc(Dxx_res, sizeof(Dxx_res));
-    if (package_num < 20)
-        package_num++;
-    else
-        package_num = 0;
 }
 unsigned char REQx6_res[] = {0x3D, 0xE0, 0x3C, 0x1A, 0x06,
                              0x00, 0x00, 0x00, 0x00,
@@ -1063,18 +1061,18 @@ void send_for_Set_filament(unsigned char *buf, int length)
     {
         if (command_2 == 0xD1) // 白色  --重置指定通道里程
             reset_filament_meters(read_num);
-        else if (command_2 == 0xB9)   //--指定通道need_pull_back
+        else if (command_2 == 0xB9) //--指定通道need_pull_back
             set_filament_motion(read_num, need_pull_back);
-        else if (command_2 == 0xC9)   //--指定通道need_send_out
+        else if (command_2 == 0xC9) //--指定通道need_send_out
             set_filament_motion(read_num, need_send_out);
-        else if (command_2 == 0xD9)   //--指定通道onuse
+        else if (command_2 == 0xD9) //--指定通道onuse
             set_filament_motion(read_num, on_use);
-        else if (command_2 == 0xE9)   //--指定通道idle
-            set_filament_motion(read_num, idle); 
-        else if (command_2 == 0xF9)   //--指定通道pre_pull
-            set_filament_motion(read_num, pre_pull);   
+        else if (command_2 == 0xE9) //--指定通道idle
+            set_filament_motion(read_num, idle);
+        else if (command_2 == 0xF9) //--指定通道pre_pull
+            set_filament_motion(read_num, pre_pull);
         else if (command_2 == 0xD3 && read_num == 0) // 棕色  --电机退料时间设定 二段
-            MOTOR_set_time_pull(true, 100);
+            MOTOR_set_time_pull(true, 1000);
         else if (command_2 == 0xD3 && read_num == 1) // 棕色  --电机退料时间设定
             MOTOR_set_time_pull(true, 2000);
         else if (command_2 == 0xD3 && read_num == 2) // 棕色  --电机退料时间设定 --默认 8s
@@ -1247,11 +1245,15 @@ void Bmcu_set_num(uint8_t num)
 }
 bool Bmcu_select()
 {
-    return Bmcu_select_flag;
-    /*
-    if (!Bmcu_select_flag && Bmcu_selest_count < get_time64())
+    // return Bmcu_select_flag;
+
+    if (Bmcu_select_flag)
+    {
+        Bmcu_selest_count = get_time64() + 2000;
+        return true;
+    }
+    else if (Bmcu_selest_count < get_time64() && !Bmcu_select_flag)
         return false;
     else
         return true;
-    */
 }
