@@ -1,5 +1,16 @@
 #include "Motion_control.h"
 
+#define BMCUMotor_version 7
+#define use_flash_addr ((uint32_t)0x0800FA00)
+struct alignas(4) Motor_save_struct
+{
+    uint8_t version = BMCUMotor_version;
+    uint16_t pwm_zero[4] = {320, 320, 320, 320};
+    uint8_t position[4] = {0, 0, 0, 0};
+    uint64_t time_pull = 2000;
+    uint64_t time_pull_t1 = 2000;
+} motor_save;
+
 uint8_t hub_mode = 1; // 是否为集线器模式，0-独立模式，1-集线器模式，2-集线器模式-外置缓冲
 bool motor_ready = false;
 /******************************     AS5600 角度传感器接口       *******************************/
@@ -20,8 +31,10 @@ void MC_PULL_ONLINE_init()
 
 /******************************     控制相关变量       *******************************/
 float MC_PULL_stu_raw[4] = {0, 0, 0, 0};
+float MC_PULL_old[4] = {0, 0, 0, 0};
 int MC_PULL_stu[4] = {0, 0, 0, 0};
 float MC_ONLINE_key_stu_raw[4] = {0, 0, 0, 0};
+float MC_ONLINE_old[4] = {0, 0, 0, 0};
 // 0-离线 1-在线单微动触发 2-双微动触发 3-抖动
 int MC_ONLINE_key_stu[4] = {3, 3, 3, 3};
 int Host_ONLINE_key_stu = 0;
@@ -75,17 +88,6 @@ void Host_stu_update(uint8_t online_key, uint8_t pull_key)
         Host_PULL_stu_raw = ((temp_pull / 128) + 1.0f); // 0~128 映射 1.0~3.0V
     }
 }
-
-#define BMCUMotor_version 7
-#define use_flash_addr ((uint32_t)0x0800FA00)
-struct alignas(4) Motor_save_struct
-{
-    uint8_t version = BMCUMotor_version;
-    uint16_t pwm_zero[4] = {320, 320, 320, 320};
-    uint8_t position[4] = {0, 0, 0, 0};
-    uint64_t time_pull = 4000;
-    uint64_t time_pull_t1 = 2000;
-} motor_save;
 
 void MC_PWM_init()
 {
@@ -236,7 +238,7 @@ public:
         if (get_filament_online(CHx) == false)
         {
             pullcheck[CHx] = 0;
-            set_filament_motion(CHx, idle);
+            // set_filament_motion(CHx, idle);
             speed_set = 0;
             PID.clear();
             Motion_control_set_PWM(CHx, 0);
@@ -304,14 +306,14 @@ public:
             x = -PWM_lim;
         if (now_speed > 0.2 || motion == 0 || now_speed < -0.2)
         {
-            time_set_speed = time_now + 5000;
+            time_set_speed = time_now + 3000;
         }
         if (time_set_speed < time_now && time_set_speed != 0)
         {
             if (x == PWM_lim || x == -PWM_lim)
             {
                 x = 0; // 防止电机卡死过热
-                if (time_set_speed < time_now - 5000)
+                if (time_set_speed < time_now - 3000)
                     PID.clear();
             }
         }
@@ -323,7 +325,7 @@ _MOTOR_CONTROL MOTOR_CONTROL[4] = {_MOTOR_CONTROL(0), _MOTOR_CONTROL(1), _MOTOR_
 
 // uint8_t ONLINE_key_stu[4] = {0, 0, 0, 0};
 // uint64_t ONLINE_key_stu_count[4] = {0, 0, 0, 0};
-// uint8_t ONLINE_key_change[4] = {0, 0, 0, 0};
+uint8_t ONLINE_key_change[4] = {0, 0, 0, 0};
 //  uint64_t ONLINE_key_change_count[4] = {0, 0, 0, 0};
 void MC_PULL_ONLINE_read()
 {
@@ -339,17 +341,9 @@ void MC_PULL_ONLINE_read()
 
     for (int i = 0; i < 4; i++)
     {
-        /*
-        if (i == 0){
-            DEBUG_MY("MC_PULL_stu_raw = ");
-            DEBUG_float(MC_PULL_stu_raw[i],3);
-            DEBUG_MY("  MC_ONLINE_key_stu_raw = ");
-            DEBUG_float(MC_ONLINE_key_stu_raw[i],3);
-            DEBUG_MY("  通道：");
-            DEBUG_float(i,1);
-            DEBUG_MY("   \n");
-        }
-        */
+        MC_PULL_stu_raw[i] = (MC_PULL_stu_raw[i] - MC_PULL_old[i]) * 0.5f + MC_PULL_old[i];
+        MC_PULL_old[i] = MC_PULL_stu_raw[i];
+
         if (hub_mode == 2 && Host_ONLINE_key_stu > 0)
         {
             MC_PULL_stu_raw[i] = Host_PULL_stu_raw; // hub_mode模式下，压力值取主控值
@@ -381,23 +375,29 @@ void MC_PULL_ONLINE_read()
         }
 
         /*在线状态*/
-
+        MC_ONLINE_key_stu_raw[i] = (MC_ONLINE_key_stu_raw[i] - MC_ONLINE_old[i]) * 0.5f + MC_ONLINE_old[i]; 
+        MC_ONLINE_old[i] = MC_ONLINE_key_stu_raw[i];    
         // 双微动
         if (MC_ONLINE_key_stu_raw[i] < 0.4f)
         { // 小于则离线.
-            MC_ONLINE_key_stu[i] = 0;
+            if (ONLINE_key_change[i] == 20)
+                MC_ONLINE_key_stu[i] = 0;
+            ONLINE_key_change[i]++;
         }
         else if ((MC_ONLINE_key_stu_raw[i] < 1.8f) & (MC_ONLINE_key_stu_raw[i] > 1.4f))
         { // 仅触发1个微动，需辅助进料
             MC_ONLINE_key_stu[i] = 1;
+            ONLINE_key_change[i] = 0;
         }
         else if (MC_ONLINE_key_stu_raw[i] > 1.8f)
         { // 双微动同时触发, 在线状态
             MC_ONLINE_key_stu[i] = 2;
+            ONLINE_key_change[i] = 0;
         }
         else if (MC_ONLINE_key_stu_raw[i] < 1.4f)
         { // 仅触发内侧微动 , 需确认是缺料还是抖动.
             MC_ONLINE_key_stu[i] = 3;
+            ONLINE_key_change[i] = 0;
         }
     }
 }
@@ -754,7 +754,7 @@ void motor_motion_run()
         switch (get_filament_motion(num))
         {
         case need_send_out:
-            RGB_set(num, 0x00, 0xFF, 0x00);
+            RGB_set(num, 0x00, 0xFF, 0x00);  // 绿灯
             pullcheck_count[num] = 0;
             //pulldelay[num] = 1;
             pull_count[num] = 0;
@@ -784,7 +784,7 @@ void motor_motion_run()
             }
             break;
         case need_pull_back:
-            RGB_set(num, 0xFF, 0x00, 0xFF);
+            RGB_set(num, 0xFF, 0x00, 0xFF);  // 紫灯
             if (pull_count[num] == 0)
                 pull_count[num] = time_now + 30000; // 退料超时时间
             else if (pull_count[num] > time_now)
@@ -813,7 +813,7 @@ void motor_motion_run()
             break;
         case on_use:
             pull_count[num] = 0;
-            RGB_set(num, 0xFF, 0xFF, 0xFF);
+            RGB_set(num, 0xFF, 0xFF, 0xFF);  // 白灯
             if (MOTOR_CONTROL[num].get_motion() == 1)
             {
                 MOTOR_CONTROL[num].set_motion(99, 150); // 停电机 清空pid
@@ -834,7 +834,7 @@ void motor_motion_run()
             }
             break;
         case pre_pull:
-            RGB_set(num, 0xFF, 0x00, 0xFF);
+            RGB_set(num, 0xFF, 0x00, 0xFF);  // 紫灯
             if (MC_PULL_stu[num] == -2)
                 MOTOR_CONTROL[num].set_motion(0, 100);
             else
