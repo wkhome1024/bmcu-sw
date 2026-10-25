@@ -60,11 +60,13 @@ uint8_t T_to_tangle(uint32_t time)
 }
 
 int error = 0;
-uint64_t motion_run = 0;
-uint64_t led_time = 0;
 uint64_t error_time = 0;
+constexpr uint64_t kControlPeriodMs = 25; // 控制环固定 100 Hz，与总线帧率解耦
+constexpr uint64_t kLedPeriodMs = 500;
 void loop()
 {
+    uint64_t next_control = 0;
+    uint64_t next_led = 0;
 
     while (1)
     {
@@ -98,18 +100,19 @@ void loop()
                     // RGB_update();
                 }
             }
-            if (motion_run < time_now)
-            {
-                Motion_control_run(error);
-                motion_run = time_now + 50;
-            }
-            if (led_time < time_now)
-            {
-                RGB_update();
-                led_time = time_now + 500;
-            }
         }
-        
+
+        // 控制节拍只由本地时基决定：即使总线静默，电机闭环仍按 100 Hz 运行。
+        if (time_now >= next_control)
+        {
+            Motion_control_run(error);
+            next_control = time_now + kControlPeriodMs;
+        }
+        if (time_now >= next_led)
+        {
+            RGB_update();
+            next_led = time_now + kLedPeriodMs;
+        }
         delay(1);
     }
 }
