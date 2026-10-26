@@ -1187,7 +1187,11 @@ package_type BambuBus_run()
             Bambubus_need_to_save = true;
         }
     }
-    if (timex > time_motion + 60000) // 非冲刷时保存
+    if (Bmcu_select_flag)
+    {
+        time_motion = timex + 5000;
+    }
+    if (timex > time_motion + 600000) // 非冲刷时保存
     {
         if (!Bmcu_select_flag)
         {

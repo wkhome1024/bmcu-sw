@@ -910,10 +910,10 @@ void motor_motion_run(uint64_t time_now)
     {
         if (i != num && MOTOR_CONTROL[i].get_motion() != 0)
         {
-            MOTOR_CONTROL[i].run(speed_as5600[i]);
+            MOTOR_CONTROL[i].run(speed_as5600[i], time_now);
         }
     }
-    MOTOR_CONTROL[num].run(speed_as5600[num]);
+    MOTOR_CONTROL[num].run(speed_as5600[num], time_now);
 }
 bool bmcuset_en = false;
 uint64_t time_bmcuset = 0;
