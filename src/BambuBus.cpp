@@ -359,31 +359,6 @@ package_type get_packge_type(unsigned char *buf, int length)
             return BambuBus_package_ETC;
         }
     }
-    else if (0)
-    {
-        Bambubus_long_package_analysis(buf, length, &printer_data_long);
-        if (printer_data_long.target_address == 0x0700)
-        {
-            BambuBus_address = printer_data_long.target_address;
-        }
-        else if (printer_data_long.target_address == 0x1200)
-        {
-            BambuBus_address = printer_data_long.target_address;
-        }
-
-        switch (printer_data_long.type)
-        {
-        case 0x21A:
-            return BambuBus_long_package_MC_online;
-        case 0x211:
-            return BambuBus_longe_package_filament;
-        case 0x103:
-        case 0x402:
-            return BambuBus_long_package_version;
-        default:
-            return BambuBus_package_ETC;
-        }
-    }
     return BambuBus_package_NONE;
 }
 
@@ -615,54 +590,134 @@ unsigned char Cxx_res[] = {0x7D, 0x0E,
                            0x00, 0x00, 0x00, 0x00, // meters
                            0x55,                   // online
                            0xE4};                  // crc8校验位
-void send_for_Cxx(unsigned char *buf, int length)
+
+// 从机执行器命令层：0x03 状态帧和 0x08 命令都先翻译成这些命令。
+enum ExecCmd : uint8_t
 {
-    unsigned char AMS_num = buf[3];
-    unsigned char read_num = buf[4];
-    unsigned char statu_flags = buf[5];
-    unsigned char fliment_motion_flag = buf[6];
-    Cxx_res[0] = 0x7D;
-    Host_stu_update(buf[7], buf[8]); // 更新缓冲状态
-    /*if (!set_motion(AMS_num, read_num, statu_flags, fliment_motion_flag))
-        return;*/
-    if (data_save.bmcu != AMS_num)
+    EXEC_IDLE,
+    EXEC_SEND,
+    EXEC_SEND_RESET,
+    EXEC_PULL,
+    EXEC_ONUSE,
+    EXEC_PREPULL,
+    EXEC_STOP_ALL,
+};
+
+// 只写运行时 mode/pressure，不碰 Flash。
+static bool exec_command(uint8_t tray, ExecCmd cmd)
+{
+    if (cmd == EXEC_STOP_ALL)
     {
-        if (read_num != 0xFF)
+        for (int i = 0; i < 4; i++)
         {
-            if (statu_flags == 0x07 || statu_flags == 0x03)
+            if (data_save.filament[i].motion_set != on_use)
+                data_save.filament[i].motion_set = idle;
+            data_save.filament[i].pressure = 0xFFFF;
+        }
+        return true;
+    }
+
+    if (tray >= 4)
+        return false;
+
+    if (cmd == EXEC_SEND || cmd == EXEC_SEND_RESET)
+    {
+        if (cmd == EXEC_SEND_RESET && data_save.BambuBus_now_filament_num != tray)
+        {
+            for (int i = 0; i < 4; i++)
             {
-                Bmcu_select_flag = false;
-                /*
-                for (int i = 0; i < 4; i++)
-                {
-                    if (data_save.filament[i].motion_set == need_pull_back)
-                        set_filament_motion(i, idle);
-                }
-                */
+                data_save.filament[i].motion_set = idle;
+                data_save.filament[i].pressure = 0xFFFF;
             }
         }
-        return;
+        data_save.filament[tray].motion_set = need_send_out;
+        data_save.filament[tray].pressure = 0x4700;
+    }
+    else if (cmd == EXEC_PULL)
+    {
+        data_save.filament[tray].motion_set = need_pull_back;
+        data_save.filament[tray].pressure = 0x4700;
+    }
+    else if (cmd == EXEC_ONUSE)
+    {
+        data_save.filament[tray].motion_set = on_use;
+        data_save.filament[tray].pressure = 0x2B00;
+    }
+    else if (cmd == EXEC_PREPULL)
+    {
+        data_save.filament[tray].motion_set = pre_pull;
+        data_save.filament[tray].pressure = 0x2B00;
     }
     else
     {
-        if (read_num < 4 && !Bmcu_select_flag)
-        {
-            Bmcu_select_flag = true;
-            // Bmcu_selest_count = 0;
-        }
-        else if (read_num == 0xFF && statu_flags == 0x01)
-        {
-            Bmcu_select_flag = false;
-            // Bmcu_selest_count = get_time64() + 2000;
-        }
+        data_save.filament[tray].motion_set = idle;
+        data_save.filament[tray].pressure = 0xFFFF;
     }
+    data_save.BambuBus_now_filament_num = tray;
+    return true;
+}
 
-    if (!set_motion(AMS_num, read_num, statu_flags, fliment_motion_flag))
+// 0x03 直写模式：flag 低 4 位就是通道状态（与 0x7D 回复的 flagx 一致）。
+static void write_channel_flag(uint8_t tray, uint8_t flag)
+{
+    if (tray >= 4)
+        return;
+    switch (flag & 0x0F)
+    {
+    case 0x01:
+        data_save.filament[tray].motion_set = need_pull_back;
+        data_save.filament[tray].pressure = 0x4700;
+        break;
+    case 0x02:
+        data_save.filament[tray].motion_set = need_send_out;
+        data_save.filament[tray].pressure = 0x4700;
+        break;
+    case 0x03:
+        data_save.filament[tray].motion_set = pre_pull;
+        data_save.filament[tray].pressure = 0x2B00;
+        break;
+    case 0x04:
+        data_save.filament[tray].motion_set = on_use;
+        data_save.filament[tray].pressure = 0x2B00;
+        break;
+    default:
+        data_save.filament[tray].motion_set = idle;
+        data_save.filament[tray].pressure = 0xFFFF;
+        break;
+    }
+}
+
+void send_for_Cxx(unsigned char *buf, int length)
+{
+    // 旧 10 字节 0x03 兼容格式：
+    // 9D 0A 03 AMS tray flagx reserved online pull crc
+    // statu_flags 位改作 flagx；fliment_motion_flag 位待用。
+    // 只修改 tray 指向的当前通道，其他通道保持原状态。
+    if (length < 10)
         return;
 
-    set_motion_res_datas(Cxx_res + 2, AMS_num, read_num, statu_flags);
-    package_send_with_crc(Cxx_res, sizeof(Cxx_res));
+    unsigned char AMS_num = buf[3];
+    unsigned char tray = buf[4];
+    unsigned char flag = buf[5];
+    Cxx_res[0] = 0x7D;
 
+    if (data_save.bmcu != AMS_num)
+        return;
+
+    if (tray < 4)
+    {
+        write_channel_flag(tray, flag);
+        data_save.BambuBus_now_filament_num = tray;
+        Bmcu_select_flag = true;
+    }
+    else
+    {
+        Bmcu_select_flag = false;
+    }
+
+    Host_stu_update(buf[7], buf[8]); // online / pull
+    set_motion_res_datas(Cxx_res + 2, AMS_num, tray, 0);
+    package_send_with_crc(Cxx_res, sizeof(Cxx_res));
 }
 /*
 0x00, 0x00, 0x00, 0xFF, // 0x0C...
@@ -770,34 +825,31 @@ unsigned char REQx6_res[] = {0x3D, 0xE0, 0x3C, 0x1A, 0x06,
                              0x90, 0xE4};
 void send_for_REQx6(unsigned char *buf, int length)
 {
-    /*
-        unsigned char filament_flag_on = 0x00;
-        unsigned char filament_flag_NFC = 0x00;
-        for (auto i = 0; i < 4; i++)
-        {
-            if (data_save.filament[i].statu == online)
-            {
-                filament_flag_on |= 1 << i;
-            }
-            else if (data_save.filament[i].statu == NFC_waiting)
-            {
-                filament_flag_on |= 1 << i;
-                filament_flag_NFC |= 1 << i;
-            }
-        }
-        REQx6_res[1] = 0xC0 | (package_num << 3);
-        res_for_06_num = buf[7];
-        REQx6_res[9] = filament_flag_on;
-        REQx6_res[10] = filament_flag_on - filament_flag_NFC;
-        REQx6_res[11] = filament_flag_on - filament_flag_NFC;
-        Dxx_res2[12] = res_for_06_num;
-        Dxx_res2[12] = res_for_06_num;
-        package_send_with_crc(REQx6_res, sizeof(REQx6_res));
-        need_res_for_06 = true;
-        if (package_num < 7)
-            package_num++;
-        else
-            package_num = 0;*/
+    // 0x06 设置参数帧：
+    // 9D 0A 06 AMS cmd channel value_lo value_hi reserved crc
+    // cmd: 03=pull_ms, 04=pull_t1_ms, 05=pwm_zero(all)
+    if (length < 10)
+        return;
+
+    unsigned char AMS_num = buf[3];
+    if (data_save.bmcu != AMS_num)
+        return;
+
+    unsigned char cmd = buf[4];
+    uint16_t value = (uint16_t)buf[6] | ((uint16_t)buf[7] << 8);
+
+    if (cmd == 0x03)
+    {
+        MOTOR_set_time_pull(true, value);
+    }
+    else if (cmd == 0x04)
+    {
+        MOTOR_set_time_pull(false, value);
+    }
+    else if (cmd == 0x05)
+    {
+        MOTOR_set_pwm_zero(value);
+    }
 }
 
 void NFC_detect_run()
@@ -977,20 +1029,22 @@ void send_for_Set_filament(unsigned char *buf, int length)
     {
         return;
     }
+    if (read_num != 0xFF && read_num >= 4)
+        return;
     else
     {
-        if (command_2 == 0xD1) // 白色  --重置指定通道里程
+        if (command_2 == 0xD1) // 白色  --重置指定通道里程（仅 RAM）
             reset_filament_meters(read_num);
         else if (command_2 == 0xB9) //--指定通道need_pull_back
-            set_filament_motion(read_num, need_pull_back);
+            exec_command(read_num, EXEC_PULL);
         else if (command_2 == 0xC9) //--指定通道need_send_out
-            set_filament_motion(read_num, need_send_out);
+            exec_command(read_num, EXEC_SEND);
         else if (command_2 == 0xD9) //--指定通道onuse
-            set_filament_motion(read_num, on_use);
+            exec_command(read_num, EXEC_ONUSE);
         else if (command_2 == 0xE9) //--指定通道idle
-            set_filament_motion(read_num, idle);
+            exec_command(read_num, EXEC_IDLE);
         else if (command_2 == 0xF9) //--指定通道pre_pull
-            set_filament_motion(read_num, pre_pull);
+            exec_command(read_num, EXEC_PREPULL);
         else if (command_2 == 0xD3 && read_num == 0) // 棕色  --电机退料时间设定 二段
             MOTOR_set_time_pull(true, 1000);
         else if (command_2 == 0xD3 && read_num == 1) // 棕色  --电机退料时间设定
@@ -1018,20 +1072,6 @@ void send_for_Set_filament(unsigned char *buf, int length)
         // else if (command_2 == 0xD7)               ////灰色  --电机标定
         // MOTOR_get_pwm_zero();
     }
-
-    /*
-    memcpy(data_save.filament[read_num].ID, buf + 7, sizeof(data_save.filament[read_num].ID));
-
-    data_save.filament[read_num].color_R = buf[15];
-    data_save.filament[read_num].color_G = buf[16];
-    data_save.filament[read_num].color_B = buf[17];
-    data_save.filament[read_num].color_A = buf[18];
-
-    memcpy(&data_save.filament[read_num].temperature_min, buf + 19, 2);
-    memcpy(&data_save.filament[read_num].temperature_max, buf + 21, 2);
-    memcpy(data_save.filament[read_num].name, buf + 23, sizeof(data_save.filament[read_num].name));
-    //package_send_with_crc(Set_filament_res, sizeof(Set_filament_res));
-    Bambubus_set_need_to_save();*/
 }
 package_type BambuBus_run()
 {
@@ -1065,26 +1105,11 @@ package_type BambuBus_run()
         case BambuBus_package_filament_motion_long:
             send_for_Dxx(buf_X, data_length);
             break;
-        case BambuBus_package_online_detect:
-            // send_for_Fxx(buf_X, data_length);
-            break;
-        case BambuBus_package_REQx6:
-            // send_for_REQx6(buf_X, data_length);
-            break;
-        case BambuBus_long_package_MC_online:
-            // send_for_long_packge_MC_online(buf_X, data_length);
-            break;
-        case BambuBus_longe_package_filament:
-            // send_for_long_packge_filament(buf_X, data_length);
-            break;
-        case BambuBus_long_package_version:
-            // send_for_long_packge_version(buf_X, data_length);
-            break;
-        case BambuBus_package_NFC_detect:
-            // send_for_NFC_detect(buf_X, data_length);
-            break;
         case BambuBus_package_set_filament:
             send_for_Set_filament(buf_X, data_length);
+            break;
+        case BambuBus_package_REQx6:
+            send_for_REQx6(buf_X, data_length);
             break;
         default:
             break;

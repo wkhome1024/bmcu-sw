@@ -114,6 +114,19 @@ bool write_slot(uint16_t slot, uint16_t seq, const Settings &cfg)
 
     return flash_program_verify(kPageAddr + slot * kSlotSize, &rec, sizeof(rec));
 }
+
+void sanitize_settings(Settings &cfg)
+{
+    for (int i = 0; i < 4; i++)
+    {
+        if (cfg.pwm_zero[i] < 100 || cfg.pwm_zero[i] > 600)
+            cfg.pwm_zero[i] = 320;
+    }
+    if (cfg.pull_ms < 100 || cfg.pull_ms > 60000)
+        cfg.pull_ms = 4000;
+    if (cfg.pull_t1_ms < 100 || cfg.pull_t1_ms > 60000)
+        cfg.pull_t1_ms = 2000;
+}
 } // namespace
 
 bool Settings_load()
@@ -152,6 +165,7 @@ bool Settings_load()
     if (have_best)
     {
         g_settings = best.cfg;
+        sanitize_settings(g_settings);
         g_seq = best.seq;
         g_last_slot = any_used ? last_used : 0;
         g_dirty = false;
@@ -160,6 +174,7 @@ bool Settings_load()
 
     // 不保留旧配置：整页擦除，写默认 Settings。
     g_settings = Settings{};
+    sanitize_settings(g_settings);
     g_seq = 1;
     g_last_slot = 0;
     g_dirty = false;
@@ -191,7 +206,11 @@ bool Settings_save()
 
     const uint16_t seq = (uint16_t)(g_seq + 1);
     if (!write_slot(target, seq, g_settings))
+    {
+        // 失败槽位可能已写了一半；下次从下一个槽继续，避免重复写同一非空槽。
+        g_last_slot = target;
         return false;
+    }
 
     g_last_slot = target;
     g_seq = seq;
