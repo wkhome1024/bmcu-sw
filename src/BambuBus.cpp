@@ -544,7 +544,7 @@ void send_for_Hit(unsigned char *buf, int length)
     else if ((buf[5] &= 0xC0) && BambuBus_address == 0)
     {
         BambuBus_address = 0x1200;
-    }    
+    }
     */
     if (data_save.bmcu != AMS_num)
         return;
@@ -707,8 +707,11 @@ void send_for_Cxx(unsigned char *buf, int length)
     if (tray < 4)
     {
         write_channel_flag(tray, flag);
-        data_save.BambuBus_now_filament_num = tray;
-        Bmcu_select_flag = true;
+        if (data_save.filament[tray].motion_set != idle)
+        {
+            data_save.BambuBus_now_filament_num = tray;
+            Bmcu_select_flag = true;
+        }
     }
     else
     {

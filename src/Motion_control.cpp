@@ -623,7 +623,7 @@ void motor_motion_run(uint64_t time_now)
     bool select = Bmcu_select();
     uint8_t num = get_now_filament_num();
     if (num >= 4)
-        num = 0; // 防御：协议异常值不能索引 MOTOR_CONTROL[4]
+        return; // 防御：协议异常值不能索引 MOTOR_CONTROL[4]
     uint64_t time_pull = Settings_get().pull_t1_ms;
     uint64_t time_set = Settings_get().pull_ms;
     if (num != lastnum) // 通道切换
