@@ -36,6 +36,7 @@ void setup()
 {
     RCC_APB2PeriphClockCmd(RCC_APB2Periph_AFIO, ENABLE);
     GPIO_PinRemapConfig(GPIO_Remap_PD01, ENABLE);
+    Settings_load(); // 只加载设置参数；无有效记录时擦页写默认值
     BambuBus_init();
     Motion_control_init();
     RGB_init();

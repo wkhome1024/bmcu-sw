@@ -14,16 +14,6 @@ bool Bmcu_select_flag = false;
 uint64_t Bmcu_selest_count = 0;
 struct _filament
 {
-    // AMS statu
-    char ID[8] = "GFG00";
-    uint8_t color_R = 0xFF;
-    uint8_t color_G = 0xFF;
-    uint8_t color_B = 0xFF;
-    uint8_t color_A = 0xFF;
-    int16_t temperature_min = 220;
-    int16_t temperature_max = 240;
-    char name[20] = "PETG";
-
     float meters = 0;
     _filament_status statu = online;
     // printer_set
@@ -31,40 +21,26 @@ struct _filament
     uint16_t pressure = 0;
 };
 
-#define use_flash_addr ((uint32_t)0x0800F000)
-
-struct alignas(4) flash_save_struct
+// 运行时状态：不进入 Flash。
+struct alignas(4) runtime_save_struct
 {
     _filament filament[4];
     int BambuBus_now_filament_num = 0;
     uint8_t bmcu = 0;
-    uint32_t version = Bambubus_version;
-    uint32_t check = 0x40614061;
 } data_save;
 
 bool Bambubus_read()
 {
-    flash_save_struct *ptr = (flash_save_struct *)(use_flash_addr);
-    if ((ptr->check == 0x40614061) && (ptr->version == Bambubus_version))
+    Settings_load();
+    data_save.bmcu = Settings_get().bmcu;
+    for (int i = 0; i < 4; i++)
     {
-        memcpy(&data_save, ptr, sizeof(data_save));
-        return true;
+        data_save.filament[i].meters = 0;
+        data_save.filament[i].pressure = 0xFFFF;
     }
-    return false;
+    return true;
 }
-bool Bambubus_need_to_save = false;
-void Bambubus_set_need_to_save()
-{
-    Bambubus_need_to_save = true;
-}
-void Bambubus_save()
-{
-    Flash_saves(&data_save, sizeof(data_save), use_flash_addr);
-}
-void set_bmcu_num(uint8_t num)
-{
-    data_save.bmcu = num;
-}
+
 int get_now_filament_num()
 {
     return data_save.BambuBus_now_filament_num;
@@ -72,10 +48,14 @@ int get_now_filament_num()
 
 void reset_filament_meters(int num)
 {
+    if (num < 0 || num >= 4)
+        return;
     data_save.filament[num].meters = 0;
 }
 void add_filament_meters(int num, float meters)
 {
+    if (num < 0 || num >= 4 || !(meters == meters))
+        return;
     data_save.filament[num].meters += meters;
 }
 float get_filament_meters(int num)
@@ -270,30 +250,12 @@ void USART1_IRQHandler(void)
 }
 void BambuBus_init()
 {
-    bool _init_ready = Bambubus_read();
+    Bambubus_read(); // 只加载 Settings，不保留材料属性/旧配置
     crc_8.reset(0x39, 0x66, 0, false, false);
     crc_16.reset(0x1021, 0x913D, 0, false, false);
 
-    if (!_init_ready)
-    {
-        data_save.filament[0].color_R = 0xFF;
-        data_save.filament[0].color_G = 0x00;
-        data_save.filament[0].color_B = 0x00;
-        data_save.filament[1].color_R = 0xFF;
-        data_save.filament[1].color_G = 0xFF;
-        data_save.filament[1].color_B = 0xFF;
-        data_save.filament[2].color_R = 0xF9;
-        data_save.filament[2].color_G = 0x8C;
-        data_save.filament[2].color_B = 0x36;
-        data_save.filament[3].color_R = 0x16;
-        data_save.filament[3].color_G = 0x16;
-        data_save.filament[3].color_B = 0x16;
-
-        Bambubus_save();
-    }
     for (auto &i : data_save.filament)
     {
-
 #ifdef _Bambubus_DEBUG_mode_
         i.statu = online;
 #else
@@ -931,48 +893,6 @@ void send_for_long_packge_MC_online(unsigned char *buf, int length)
     data.target_address = printer_data_long.source_address;
     // Bambubus_long_package_send(&data);
 }
-unsigned char long_packge_filament[] =
-    {
-        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-        0x47, 0x46, 0x42, 0x30, 0x30, 0x00, 0x00, 0x00,
-        0x41, 0x42, 0x53, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-        0xDD, 0xB1, 0xD4, 0xFF, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-        0x18, 0x01, 0xF0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
-
-void send_for_long_packge_filament(unsigned char *buf, int length)
-{
-    long_packge_data data;
-    Bambubus_long_package_analysis(buf, length, &printer_data_long);
-
-    uint8_t AMS_num = printer_data_long.datas[0];
-    uint8_t filament_num = printer_data_long.datas[1];
-
-    if (data_save.bmcu != AMS_num)
-        return;
-
-    long_packge_filament[0] = AMS_num;
-    long_packge_filament[1] = filament_num;
-    memcpy(long_packge_filament + 19, data_save.filament[filament_num].ID, sizeof(data_save.filament[filament_num].ID));
-    memcpy(long_packge_filament + 27, data_save.filament[filament_num].name, sizeof(data_save.filament[filament_num].name));
-    long_packge_filament[59] = data_save.filament[filament_num].color_R;
-    long_packge_filament[60] = data_save.filament[filament_num].color_G;
-    long_packge_filament[61] = data_save.filament[filament_num].color_B;
-    long_packge_filament[62] = data_save.filament[filament_num].color_A;
-    memcpy(long_packge_filament + 79, &data_save.filament[filament_num].temperature_max, 2);
-    memcpy(long_packge_filament + 81, &data_save.filament[filament_num].temperature_min, 2);
-
-    data.datas = long_packge_filament;
-    data.data_length = sizeof(long_packge_filament);
-
-    data.package_number = printer_data_long.package_number;
-    data.type = printer_data_long.type;
-    data.source_address = printer_data_long.target_address;
-    data.target_address = printer_data_long.source_address;
-    Bambubus_long_package_send(&data);
-}
 unsigned char serial_number[] = {"STUDY0ONLY"};
 unsigned char long_packge_version_serial_number[] = {9, // length
                                                      'S', 'T', 'U', 'D', 'Y', 'O', 'N', 'L', 'Y', 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
@@ -1097,8 +1017,6 @@ void send_for_Set_filament(unsigned char *buf, int length)
             MOTOR_set_pwm_zero(460);
         // else if (command_2 == 0xD7)               ////灰色  --电机标定
         // MOTOR_get_pwm_zero();
-
-        Motor_set_need_to_save();
     }
 
     /*
@@ -1115,14 +1033,13 @@ void send_for_Set_filament(unsigned char *buf, int length)
     //package_send_with_crc(Set_filament_res, sizeof(Set_filament_res));
     Bambubus_set_need_to_save();*/
 }
-bool Bambubus_save_flag = false;
 package_type BambuBus_run()
 {
     package_type stu = BambuBus_package_NONE;
     static uint64_t time_set = 0;
-    static uint64_t time_motion = 0;
-    static uint64_t time_save = 0;
-    // static uint64_t time_check = 0;
+    static uint64_t select_false_since = 0;
+    static bool select_false_valid = false;
+    static uint64_t next_settings_retry = 0;
     uint64_t timex = get_time64();
     // static bool save_s = false;
     /*for (auto i : data_save.filament)
@@ -1144,7 +1061,6 @@ package_type BambuBus_run()
             break;
         case BambuBus_package_filament_motion_short:
             send_for_Cxx(buf_X, data_length);
-            time_motion = timex + 5000;
             break;
         case BambuBus_package_filament_motion_long:
             send_for_Dxx(buf_X, data_length);
@@ -1178,37 +1094,25 @@ package_type BambuBus_run()
     {
         stu = BambuBus_package_ERROR; // offline
     }
-    if (timex > time_save + 15000)
-    {
-        time_save = timex + 1800000;
-        if (Bambubus_save_flag)
-        {
-            Motor_set_need_to_save();
-            Bambubus_need_to_save = true;
-        }
-    }
+    // 只保存设置参数：settings dirty 后，等打印机空闲满 10 分钟追加一次；
+    // 里程/材料属性/打印结束都不触发保存。
     if (Bmcu_select_flag)
     {
-        time_motion = timex + 5000;
+        select_false_since = 0;
+        select_false_valid = false;
     }
-    if (timex > time_motion + 600000) // 非冲刷时保存
+    else if (!select_false_valid)
     {
-        if (!Bmcu_select_flag)
-        {
-            if (Bambubus_need_to_save)
-            {
-                Bambubus_save();
-                time_set = get_time64() + 2000;
-                Bambubus_save_flag = false;
-            }
-            if (Motor_need_to_save())
-                Motor_save();
-        }
-        Bambubus_need_to_save = false;
+        select_false_since = timex;
+        select_false_valid = true;
     }
-    else if (timex < time_motion)
+
+    const bool idle_10min =
+        (!Bmcu_select_flag && select_false_valid && (timex - select_false_since) >= 600000);
+    if (Settings_is_dirty() && idle_10min && timex >= next_settings_retry)
     {
-        Bambubus_save_flag = true;
+        if (!Settings_save())
+            next_settings_retry = timex + 10000;
     }
 
     // HAL_UART_Transmit(&use_Serial.handle,&s,1,1000);
@@ -1245,7 +1149,8 @@ void Bmcu_set_no_reset()
 void Bmcu_set_num(uint8_t num)
 {
     data_save.bmcu = num;
-    Bambubus_need_to_save = true;
+    Settings_get().bmcu = num;
+    Settings_mark_dirty();
 }
 bool Bmcu_select()
 {

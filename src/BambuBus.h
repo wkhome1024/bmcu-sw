@@ -43,8 +43,6 @@ extern "C"
     extern package_type BambuBus_run();
 #define max_filament_num 4
     extern bool Bambubus_read();
-    extern void Bambubus_save();
-    extern void Bambubus_set_need_to_save();
     extern void set_bmcu_num(uint8_t num);
     extern int get_now_filament_num();
     extern void reset_filament_meters(int num);

@@ -1,17 +1,6 @@
 #include "Motion_control.h"
 #include <math.h>
 
-#define BMCUMotor_version 7
-#define use_flash_addr ((uint32_t)0x0800FA00)
-struct alignas(4) Motor_save_struct
-{
-    uint8_t version = BMCUMotor_version;
-    uint16_t pwm_zero[4] = {320, 320, 320, 320};
-    uint8_t position[4] = {0, 0, 0, 0};
-    uint64_t time_pull = 4000;
-    uint64_t time_pull_t1 = 2000;
-} motor_save;
-
 uint8_t hub_mode = 1; // 是否为集线器模式，0-独立模式，1-集线器模式，2-集线器模式-外置缓冲
 bool motor_ready = false;
 /******************************     AS5600 角度传感器接口       *******************************/
@@ -493,73 +482,36 @@ void MOTOR_get_pwm_zero()
     for (int index = 0; index < 4; index++)
     {
         Motion_control_set_PWM(index, 0);
-        MOTOR_CONTROL[index].set_pwm_zero(pwm_zero[index]);
+        uint16_t pwm = (pwm_zero[index] >= 100 && pwm_zero[index] <= 600) ? (uint16_t)pwm_zero[index] : 320;
+        Settings_get().pwm_zero[index] = pwm;
+        MOTOR_CONTROL[index].set_pwm_zero(pwm);
     }
+    Settings_mark_dirty();
 }
 
 void MOTOR_set_pwm_zero(int pwm)
 {
-    motor_save.pwm_zero[0] = pwm;
-    motor_save.pwm_zero[1] = pwm;
-    motor_save.pwm_zero[2] = pwm;
-    motor_save.pwm_zero[3] = pwm;
+    Settings &s = Settings_get();
     for (int index = 0; index < 4; index++)
     {
+        const int v = (pwm >= 100 && pwm <= 600) ? pwm : 320;
+        s.pwm_zero[index] = (uint16_t)v;
         Motion_control_set_PWM(index, 0);
-        MOTOR_CONTROL[index].set_pwm_zero(motor_save.pwm_zero[index]);
+        MOTOR_CONTROL[index].set_pwm_zero(v);
     }
-}
-
-bool Motor_read()
-{
-    Motor_save_struct *ptr = (Motor_save_struct *)(use_flash_addr);
-    if (ptr->version == BMCUMotor_version)
-    {
-        memcpy(&motor_save, ptr, sizeof(motor_save));
-        return true;
-    }
-    return false;
-}
-bool motor_need_to_save = false;
-void Motor_set_need_to_save()
-{
-    motor_need_to_save = true;
-}
-void Motor_save()
-{
-    /*
-    for (int index = 0; index < 4; index++)
-    {
-        motor_save.position[index] = pullcheck[index];
-    }
-    */
-    Flash_saves(&motor_save, sizeof(motor_save), use_flash_addr);
-    motor_need_to_save = false;
-}
-bool Motor_need_to_save()
-{
-    return motor_need_to_save;
+    Settings_mark_dirty();
 }
 
 void Motor_init()
 {
-    bool _init_ready = Motor_read();
-    if (!_init_ready)
-    {
-        motor_save.pwm_zero[0] = 320;
-        motor_save.pwm_zero[1] = 320;
-        motor_save.pwm_zero[2] = 320;
-        motor_save.pwm_zero[3] = 320;
-        Motor_save();
-    }
-
+    Settings_load();
     for (int index = 0; index < 4; index++)
     {
-        // pullcheck[index] = motor_save.position[index];
-        // if (pullcheck[index] == 2)
-        //     set_now_filament_num(index);
+        uint16_t pwm = Settings_get().pwm_zero[index];
+        if (pwm < 100 || pwm > 600)
+            pwm = 320;
         Motion_control_set_PWM(index, 0);
-        MOTOR_CONTROL[index].set_pwm_zero(motor_save.pwm_zero[index]);
+        MOTOR_CONTROL[index].set_pwm_zero(pwm);
     }
 }
 
@@ -692,10 +644,12 @@ bool Filament_channel_onpull(uint8_t CHx)
 
 void MOTOR_set_time_pull(bool select, uint64_t time1)
 {
+    uint16_t v = (time1 >= 100 && time1 <= 60000) ? (uint16_t)time1 : (select ? 4000 : 2000);
     if (select)
-        motor_save.time_pull = time1;
+        Settings_get().pull_ms = v;
     else
-        motor_save.time_pull_t1 = time1;
+        Settings_get().pull_t1_ms = v;
+    Settings_mark_dirty();
 }
 
 void motor_motion_run(uint64_t time_now)
@@ -705,8 +659,8 @@ void motor_motion_run(uint64_t time_now)
     uint8_t num = get_now_filament_num();
     if (num >= 4)
         num = 0; // 防御：协议异常值不能索引 MOTOR_CONTROL[4]
-    uint64_t time_pull = motor_save.time_pull_t1;
-    uint64_t time_set = motor_save.time_pull;
+    uint64_t time_pull = Settings_get().pull_t1_ms;
+    uint64_t time_set = Settings_get().pull_ms;
     if (num != lastnum) // 通道切换
     {
         if (get_filament_motion(num) != on_use) // on_use 时不做旧通道回抽
