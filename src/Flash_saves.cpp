@@ -11,7 +11,7 @@ constexpr uint32_t kPageAddr = 0x0800F000;
 constexpr uint32_t kSlotSize = 32;
 constexpr uint32_t kSlotCount = 128; // 128 * 32 = 4096
 constexpr uint32_t kMagic = 0x424D4355; // "BMCU"
-constexpr uint16_t kVersion = 2;
+constexpr uint16_t kVersion = 3;
 
 struct SettingsRecord
 {
@@ -117,11 +117,8 @@ bool write_slot(uint16_t slot, uint16_t seq, const Settings &cfg)
 
 void sanitize_settings(Settings &cfg)
 {
-    for (int i = 0; i < 4; i++)
-    {
-        if (cfg.pwm_zero[i] < 100 || cfg.pwm_zero[i] > 600)
-            cfg.pwm_zero[i] = 320;
-    }
+    if (cfg.pwm_zero < 100 || cfg.pwm_zero > 600)
+        cfg.pwm_zero = 320;
     if (cfg.pull_ms < 100 || cfg.pull_ms > 60000)
         cfg.pull_ms = 4000;
     if (cfg.pull_t1_ms < 100 || cfg.pull_t1_ms > 60000)

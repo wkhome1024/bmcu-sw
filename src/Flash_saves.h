@@ -7,11 +7,11 @@ struct Settings
 {
     uint8_t bmcu = 0;           // 从机编号
     uint8_t reserved = 0;
-    uint16_t pwm_zero[4] = {320, 320, 320, 320};
+    uint16_t pwm_zero = 320;    // 四通道统一 PWM 零点
     uint16_t pull_ms = 4000;    // 二段退料时间
     uint16_t pull_t1_ms = 2000; // 一段退料时间
 };
-static_assert(sizeof(Settings) == 14, "Settings layout changed");
+static_assert(sizeof(Settings) == 8, "Settings layout changed");
 
 // 启动时扫描 0x0800F000；无有效记录则擦页写入默认值。
 bool Settings_load();

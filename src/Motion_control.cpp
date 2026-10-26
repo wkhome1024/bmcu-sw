@@ -438,66 +438,31 @@ void Motion_control_set_PWM(uint8_t CHx, int PWM)
     }
 }
 
-void MOTOR_get_pwm_zero()
+void MOTOR_set_pwm_zero(int pwm)
 {
-    int pwm_zero[4] = {0, 0, 0, 0};
-    MC_AS5600.updata_angle();
-
-    int16_t last_angle[4];
-    for (int index = 0; index < 4; index++)
-    {
-        last_angle[index] = MC_AS5600.raw_angle[index];
-    }
-    for (int pwm = 200; pwm < 500; pwm += 20)
-    {
-        MC_AS5600.updata_angle();
-        for (int index = 0; index < 4; index++)
-        {
-
-            if (pwm_zero[index] == 0)
-            {
-                if (abs(MC_AS5600.raw_angle[index] - last_angle[index]) > 20)
-                {
-                    pwm_zero[index] = pwm - 40;
-                    Motion_control_set_PWM(index, 0);
-                }
-                else if ((MC_AS5600.online[index] == true))
-                {
-                    Motion_control_set_PWM(index, pwm);
-                }
-                last_angle[index] = MC_AS5600.raw_angle[index];
-                if (pwm == 500)
-                {
-                    pwm_zero[index] = pwm - 20;
-                }
-            }
-            else
-            {
-                Motion_control_set_PWM(index, 0);
-            }
-            delay(20);
-        }
-        delay(100);
-    }
+    const int v = (pwm >= 100 && pwm <= 600) ? pwm : 320;
+    Settings_get().pwm_zero = (uint16_t)v;
     for (int index = 0; index < 4; index++)
     {
         Motion_control_set_PWM(index, 0);
-        uint16_t pwm = (pwm_zero[index] >= 100 && pwm_zero[index] <= 600) ? (uint16_t)pwm_zero[index] : 320;
-        Settings_get().pwm_zero[index] = pwm;
-        MOTOR_CONTROL[index].set_pwm_zero(pwm);
+        MOTOR_CONTROL[index].set_pwm_zero(v);
     }
     Settings_mark_dirty();
 }
 
-void MOTOR_set_pwm_zero(int pwm)
+void MOTOR_apply_settings()
 {
     Settings &s = Settings_get();
+    uint16_t pwm = s.pwm_zero;
+    if (pwm < 100 || pwm > 600)
+    {
+        pwm = 320;
+        s.pwm_zero = pwm;
+    }
     for (int index = 0; index < 4; index++)
     {
-        const int v = (pwm >= 100 && pwm <= 600) ? pwm : 320;
-        s.pwm_zero[index] = (uint16_t)v;
         Motion_control_set_PWM(index, 0);
-        MOTOR_CONTROL[index].set_pwm_zero(v);
+        MOTOR_CONTROL[index].set_pwm_zero(pwm);
     }
     Settings_mark_dirty();
 }
@@ -505,11 +470,11 @@ void MOTOR_set_pwm_zero(int pwm)
 void Motor_init()
 {
     Settings_load();
+    uint16_t pwm = Settings_get().pwm_zero;
+    if (pwm < 100 || pwm > 600)
+        pwm = 320;
     for (int index = 0; index < 4; index++)
     {
-        uint16_t pwm = Settings_get().pwm_zero[index];
-        if (pwm < 100 || pwm > 600)
-            pwm = 320;
         Motion_control_set_PWM(index, 0);
         MOTOR_CONTROL[index].set_pwm_zero(pwm);
     }

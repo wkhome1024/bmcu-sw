@@ -838,6 +838,35 @@ void send_for_REQx6(unsigned char *buf, int length)
     unsigned char cmd = buf[4];
     uint16_t value = (uint16_t)buf[6] | ((uint16_t)buf[7] << 8);
 
+    if (cmd == 0x00)
+    {
+        // 查询当前设置：7D 0D FE AMS 06 pull_lo pull_hi t1_lo t1_hi pwm_lo pwm_hi 00 crc
+        const Settings &s = Settings_get();
+        unsigned char resp[13] = {0x7D, 0x0D, 0xFE, AMS_num, 0x06,
+                                  0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
+        resp[5] = (uint8_t)(s.pull_ms & 0xFF);
+        resp[6] = (uint8_t)(s.pull_ms >> 8);
+        resp[7] = (uint8_t)(s.pull_t1_ms & 0xFF);
+        resp[8] = (uint8_t)(s.pull_t1_ms >> 8);
+        resp[9] = (uint8_t)(s.pwm_zero & 0xFF);
+        resp[10] = (uint8_t)(s.pwm_zero >> 8);
+        package_send_with_crc(resp, sizeof(resp));
+        return;
+    }
+
+    if (cmd == 0x06 && length >= 12)
+    {
+        // 合并设置：9D 0C 06 AMS 06 pull_lo pull_hi t1_lo t1_hi pwm_lo pwm_hi crc
+        const uint16_t pull_ms = (uint16_t)buf[5] | ((uint16_t)buf[6] << 8);
+        const uint16_t pull_t1_ms = (uint16_t)buf[7] | ((uint16_t)buf[8] << 8);
+        Settings_get().pwm_zero = (uint16_t)buf[9] | ((uint16_t)buf[10] << 8);
+
+        MOTOR_set_time_pull(true, pull_ms);
+        MOTOR_set_time_pull(false, pull_t1_ms);
+        MOTOR_apply_settings();
+        return;
+    }
+
     if (cmd == 0x03)
     {
         MOTOR_set_time_pull(true, value);

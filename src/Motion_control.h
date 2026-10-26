@@ -8,7 +8,7 @@ extern void Motion_control_set_PWM(uint8_t CHx,int PWM);
 extern void Motion_control_run(int error);
 extern void MOTOR_set_time_pull(bool select ,uint64_t time1);
 extern void MOTOR_set_pwm_zero(int pwm);
-extern void MOTOR_get_pwm_zero();
+extern void MOTOR_apply_settings();
 extern void Host_stu_update(uint8_t online_key , uint8_t pull_key);
 extern bool Filament_channel_onpull(uint8_t CHx);
 extern uint8_t GET_pull_state(uint8_t CHx);
