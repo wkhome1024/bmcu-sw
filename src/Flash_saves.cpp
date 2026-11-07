@@ -9,7 +9,7 @@ namespace
 {
 constexpr uint32_t kPageAddr = 0x0800F000;
 constexpr uint32_t kSlotSize = 32;
-constexpr uint32_t kSlotCount = 128; // 128 * 32 = 4096
+constexpr uint32_t kSlotCount = 120; // 128 * 32 = 4096
 constexpr uint32_t kMagic = 0x424D4355; // "BMCU"
 constexpr uint16_t kVersion = 3;
 
@@ -61,7 +61,6 @@ bool record_is_valid(const SettingsRecord &rec)
 
 bool flash_erase_page(uint32_t address)
 {
-    const uint32_t mstatus = __get_MSTATUS();
     bool ok = true;
     __disable_irq();
     FLASH_Unlock();
@@ -69,14 +68,13 @@ bool flash_erase_page(uint32_t address)
     if (FLASH_ErasePage(address) != FLASH_COMPLETE)
         ok = false;
     FLASH_Lock();
-    __set_MSTATUS(mstatus);
+    __enable_irq();
     return ok;
 }
 
 bool flash_program_verify(uint32_t address, const void *buf, uint32_t length)
 {
     const uint16_t *src = (const uint16_t *)buf;
-    const uint32_t mstatus = __get_MSTATUS();
     bool ok = true;
 
     __disable_irq();
@@ -95,7 +93,7 @@ bool flash_program_verify(uint32_t address, const void *buf, uint32_t length)
     }
 
     FLASH_Lock();
-    __set_MSTATUS(mstatus);
+    __enable_irq();
     return ok;
 }
 
@@ -176,8 +174,8 @@ bool Settings_load()
     g_last_slot = 0;
     g_dirty = false;
 
-    if (!flash_erase_page(kPageAddr))
-        return false;
+    //if (!flash_erase_page(kPageAddr))
+    //    return false;
     if (!write_slot(0, g_seq, g_settings))
         return false;
     return true;

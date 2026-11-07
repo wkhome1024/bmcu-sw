@@ -62,7 +62,7 @@ uint8_t T_to_tangle(uint32_t time)
 
 int error = 0;
 uint64_t error_time = 0;
-constexpr uint64_t kControlPeriodMs = 25; // 控制环固定 100 Hz，与总线帧率解耦
+constexpr uint64_t kControlPeriodMs = 35; // 控制环固定 33 Hz，与总线帧率解耦
 constexpr uint64_t kLedPeriodMs = 500;
 void loop()
 {

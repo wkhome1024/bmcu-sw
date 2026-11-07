@@ -222,8 +222,9 @@ public:
     {
         pwm_zero = _pwm_zero;
     }
-    void run(float now_speed, uint64_t time_now)
+    void run(float now_speed)
     {
+        uint64_t time_now = get_time64();
         float dt = (time_now - time_last) * 0.001f;
         time_last = time_now;
         if (isnan(now_speed) || isinf(now_speed))
@@ -469,7 +470,7 @@ void MOTOR_apply_settings()
 
 void Motor_init()
 {
-    Settings_load();
+    //Settings_load();
     uint16_t pwm = Settings_get().pwm_zero;
     if (pwm < 100 || pwm > 600)
         pwm = 320;
@@ -500,34 +501,22 @@ void Motion_control_init()
 void AS5600_distance_updata()
 {
     static int32_t distance_save[4] = {0, 0, 0, 0};
-    static bool distance_init[4] = {false, false, false, false};
     static uint64_t time_last = 0;
     uint64_t time_now = get_time64();
-    uint64_t dt_ms = time_now - time_last;
     MC_AS5600.updata_angle();
-    if (dt_ms == 0)
-        return; // 同一毫秒重复调用，丢弃本次样本，避免除零/NaN
-
     for (int i = 0; i < 4; i++)
     {
         if ((MC_AS5600.online[i] == false) || (MC_AS5600.magnet_stu[i] == -1))
         {
             distance_save[i] = 0;
-            distance_init[i] = false;
             speed_as5600[i] = 0;
-            continue;
-        }
-
-        int32_t now_distance = MC_AS5600.raw_angle[i];
-        if (!distance_init[i]) // 首样本只建立基准，不产生速度
-        {
-            distance_save[i] = now_distance;
-            distance_init[i] = true;
             continue;
         }
 
         int32_t cir_E = 0;
         int32_t last_distance = distance_save[i];
+        int32_t now_distance = MC_AS5600.raw_angle[i];
+        float distance_E;
         if ((now_distance > 3072) && (last_distance <= 1024))
         {
             cir_E = -4096;
@@ -537,26 +526,12 @@ void AS5600_distance_updata()
             cir_E = 4096;
         }
 
-        float distance_E = (float)(now_distance - last_distance + cir_E) * AS5600_PI * 7.5 / 4096; // D=7.5mm
+        distance_E = (float)(now_distance - last_distance + cir_E) * AS5600_PI * 7.5 / 4096; // D=7.5mm
         distance_save[i] = now_distance;
-
-        // 单周期跳变过大：视为传感器异常/丢样，丢弃本次，不更新速度
-        if (distance_E > 100.0f || distance_E < -100.0f)
-            continue;
-
-        float speedx = distance_E / (float)dt_ms * 1000.0f;
-        if (isnan(speedx) || isinf(speedx))
-            speedx = 0.0f;
-        if (speedx > 500.0f)
-            speedx = 500.0f;
-        if (speedx < -500.0f)
-            speedx = -500.0f;
-
-        float T = speed_filter_k / ((float)dt_ms + speed_filter_k);
-        speed_as5600[i] = speedx * (1.0f - T) + speed_as5600[i] * T; // mm/s
-        if (isnan(speed_as5600[i]) || isinf(speed_as5600[i]))
-            speed_as5600[i] = 0.0f;
-
+        float T = (float)(time_now - time_last);
+        float speedx = distance_E / T * 1000;
+        T = speed_filter_k / (T + speed_filter_k);
+        speed_as5600[i] = speedx * (1 - T) + speed_as5600[i] * T; // mm/s
         if (get_filament_motion(i) != on_use || distance_E > 0)
             add_filament_meters(i, distance_E / 1000);
     }
@@ -617,39 +592,48 @@ void MOTOR_set_time_pull(bool select, uint64_t time1)
     Settings_mark_dirty();
 }
 
-void motor_motion_run(uint64_t time_now)
+void motor_motion_run()
 {
     static uint8_t lastnum = 0;
     bool select = Bmcu_select();
     uint8_t num = get_now_filament_num();
-    if (num >= 4)
-        return; // 防御：协议异常值不能索引 MOTOR_CONTROL[4]
     uint64_t time_pull = Settings_get().pull_t1_ms;
     uint64_t time_set = Settings_get().pull_ms;
+    uint64_t time_now = get_time64();
     if (num != lastnum) // 通道切换
     {
-        if (get_filament_motion(num) != on_use) // on_use 时不做旧通道回抽
+        if (get_filament_motion(num) == on_use) // 意外掉线
         {
-            if (pullcheck[lastnum] == 2 && Host_ONLINE_key_stu == 0)
-            {
-                if (MOTOR_CONTROL[lastnum].get_motion() == 0)
-                    MOTOR_CONTROL[lastnum].set_motion(-1, time_set); // 短回抽通道 退料
-                else if (MOTOR_CONTROL[lastnum].get_motion() < 0)
-                {
-                    MOTOR_CONTROL[lastnum].set_motion_add(-1, time_set); // 短回抽通道 退料
-                }
-                Pullcheck_clear();
-            }
-            else if (pullcheck[lastnum] == 2 && Host_ONLINE_key_stu > 0)
-            {
-                MOTOR_CONTROL[lastnum].set_motion(-66, time_pull);
-            }
-            if (MOTOR_CONTROL[lastnum].get_motion() < 0 && MC_ONLINE_key_stu[lastnum] < 2)
-            {
-                MOTOR_CONTROL[lastnum].set_motion(1, 500);
-            }
+            lastnum = num;
+            return;
         }
-        lastnum = num; // 旧通道的 motion 继续在末尾的统一 run 中执行，不再阻塞新通道
+        if (pullcheck[lastnum] == 2 && Host_ONLINE_key_stu == 0)
+        {
+            if (MOTOR_CONTROL[lastnum].get_motion() == 0)
+                MOTOR_CONTROL[lastnum].set_motion(-1, time_set); // 短回抽通道 退料
+            else if (MOTOR_CONTROL[lastnum].get_motion() < 0)
+            {
+                MOTOR_CONTROL[lastnum].set_motion_add(-1, time_set); // 短回抽通道 退料
+            }
+            Pullcheck_clear();
+        }
+        else if (pullcheck[lastnum] == 2 && Host_ONLINE_key_stu > 0)
+        {
+            MOTOR_CONTROL[lastnum].set_motion(-66, time_pull);
+        }
+        if (MOTOR_CONTROL[lastnum].get_motion() == 0)
+        {
+            lastnum = num;
+            return;
+        }
+        else if (MOTOR_CONTROL[lastnum].get_motion() < 0 && MC_ONLINE_key_stu[lastnum] < 2)
+        {
+            MOTOR_CONTROL[lastnum].set_motion(1, 500);
+            MOTOR_CONTROL[lastnum].run(speed_as5600[lastnum]);
+            lastnum = num;
+        }
+        MOTOR_CONTROL[lastnum].run(speed_as5600[lastnum]);
+        return;
     }
 
     if (Bmcu_reset())
@@ -829,10 +813,11 @@ void motor_motion_run(uint64_t time_now)
     {
         if (i != num && MOTOR_CONTROL[i].get_motion() != 0)
         {
-            MOTOR_CONTROL[i].run(speed_as5600[i], time_now);
+            MOTOR_CONTROL[i].run(speed_as5600[i]);
+            return;
         }
     }
-    MOTOR_CONTROL[num].run(speed_as5600[num], time_now);
+    MOTOR_CONTROL[num].run(speed_as5600[num]);
 }
 bool bmcuset_en = false;
 uint64_t time_bmcuset = 0;
@@ -928,5 +913,5 @@ void Motion_control_run(int error)
         }
     }
 
-    motor_motion_run(time_now);
+    motor_motion_run();
 }

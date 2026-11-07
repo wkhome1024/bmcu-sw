@@ -31,7 +31,7 @@ struct alignas(4) runtime_save_struct
 
 bool Bambubus_read()
 {
-    Settings_load();
+    //Settings_load();
     data_save.bmcu = Settings_get().bmcu;
     for (int i = 0; i < 4; i++)
     {
@@ -620,6 +620,11 @@ static bool exec_command(uint8_t tray, ExecCmd cmd)
     if (tray >= 4)
         return false;
 
+    // 0x08/0x03 命令指向具体通道时，同时建立“当前通道”选中状态；
+    // 不能只依赖 0x04 状态帧，否则只发 0x08 时电机会因未选中而不动作。
+    if (cmd != EXEC_IDLE)
+        Bmcu_select_flag = true;
+
     if (cmd == EXEC_SEND || cmd == EXEC_SEND_RESET)
     {
         if (cmd == EXEC_SEND_RESET && data_save.BambuBus_now_filament_num != tray)
@@ -699,8 +704,16 @@ void send_for_Cxx(unsigned char *buf, int length)
     unsigned char AMS_num = buf[3];
     unsigned char tray = buf[4];
     unsigned char flag = buf[5];
-    Cxx_res[0] = 0x7D;
-
+    unsigned char now = buf[6];
+    if (data_save.bmcu == now / 4)
+    {
+        data_save.BambuBus_now_filament_num = now % 4;
+    }
+    else
+    {
+        Bmcu_select_flag = false;
+    }
+    // Cxx_res[0] = 0x7D;
     if (data_save.bmcu != AMS_num)
         return;
 
@@ -720,7 +733,7 @@ void send_for_Cxx(unsigned char *buf, int length)
 
     Host_stu_update(buf[7], buf[8]); // online / pull
     set_motion_res_datas(Cxx_res + 2, AMS_num, tray, 0);
-    package_send_with_crc(Cxx_res, sizeof(Cxx_res));
+    // package_send_with_crc(Cxx_res, sizeof(Cxx_res));
 }
 /*
 0x00, 0x00, 0x00, 0xFF, // 0x0C...

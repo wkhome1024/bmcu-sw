@@ -9,7 +9,7 @@ struct Settings
     uint8_t reserved = 0;
     uint16_t pwm_zero = 320;    // 四通道统一 PWM 零点
     uint16_t pull_ms = 4000;    // 二段退料时间
-    uint16_t pull_t1_ms = 2000; // 一段退料时间
+    uint16_t pull_t1_ms = 4000; // 一段退料时间
 };
 static_assert(sizeof(Settings) == 8, "Settings layout changed");
 
